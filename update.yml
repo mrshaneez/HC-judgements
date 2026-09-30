@@ -1,0 +1,33 @@
+name: Daily update (enumerate)
+
+# Walks the court's decisions list and adds any new judgments (metadata only).
+# Times are UTC; Maldives is UTC+5, so "0 1 * * *" = 6:00 AM Maldives daily.
+# Edit the cron line to change time/frequency (https://crontab.guru).
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      target_year:
+        description: "Limit to one year (blank = all years). Use blank for the first full backfill."
+        required: false
+        default: ""
+
+jobs:
+  enumerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Enumerate judgments
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          MODE: enumerate
+          TARGET_YEAR: ${{ github.event.inputs.target_year }}
+        run: python scripts/scrape.py

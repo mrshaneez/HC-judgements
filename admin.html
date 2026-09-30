@@ -3,48 +3,46 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Admin — 2026 High Court Judges</title>
+<title>Admin — Maldives Judgments</title>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--ink:#1a2733;--muted:#5c6b7a;--accent:#1F3B57;--line:#e3e8ee;--hi:#2f6fb0;--danger:#c0392b;--ok:#2f6b2f}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
-.wrap{max-width:1280px;margin:0 auto;padding:24px 16px 60px}
-.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-h1{font-size:1.4rem;margin:0}
+.wrap{max-width:1300px;margin:0 auto;padding:22px 16px 70px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:1.35rem;margin:0}
 a{color:var(--hi)}
-button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:#fff;padding:8px 14px}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:#fff;padding:8px 14px;color:var(--ink)}
 button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 button.danger{color:var(--danger);border-color:#e8c9c4}
-button:hover{filter:brightness(.97)}
-.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;width:100%}
-input[type=search]{max-width:280px}
+button[disabled]{opacity:.4;cursor:default}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab{padding:8px 16px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer}
+.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;width:100%;color:var(--ink)}
+input[type=search]{max-width:300px}
 .login{max-width:360px;margin:12vh auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
-.login h2{margin:0 0 12px}
 table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:.86rem}
 th,td{padding:8px 9px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
-th{background:var(--accent);color:#fff;font-size:.8rem;white-space:nowrap}
+th{background:var(--accent);color:#fff;font-size:.78rem;white-space:nowrap}
 tr:hover td{background:#f0f5fa}
 .thaana{font-family:"MV Faseyha","MV Boli",Arial;direction:rtl;unicode-bidi:isolate}
-.lock{font-size:.75rem;color:var(--muted)}
-.actions{white-space:nowrap}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.pager{display:flex;gap:10px;align-items:center;justify-content:center;margin:14px 0}
 .actions button{padding:4px 9px;font-size:.8rem}
 .msg{padding:9px 12px;border-radius:8px;margin:10px 0;font-size:.9rem;display:none}
-.msg.err{background:#fce4e4;color:var(--danger);display:block}
-.msg.ok{background:#e6f0e6;color:var(--ok);display:block}
-/* modal */
-.overlay{position:fixed;inset:0;background:rgba(20,30,40,.45);display:none;align-items:flex-start;justify-content:center;padding:24px;overflow:auto;z-index:10}
+.msg.err{background:#fce4e4;color:var(--danger);display:block}.msg.ok{background:#e6f0e6;color:var(--ok);display:block}
+.overlay{position:fixed;inset:0;background:rgba(20,30,40,.45);display:none;align-items:flex-start;justify-content:center;padding:22px;overflow:auto;z-index:20}
 .overlay.open{display:flex}
-.modal{background:#fff;border-radius:12px;max-width:640px;width:100%;padding:22px;margin-top:4vh}
+.modal{background:#fff;border-radius:12px;max-width:720px;width:100%;padding:22px;margin-top:3vh}
 .modal h3{margin:0 0 14px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .grid .full{grid-column:1/3}
 label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
-.modal .foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:10px}
-.hint{font-size:.78rem;color:var(--muted);margin-top:4px}
-.chk{display:flex;align-items:center;gap:8px}
-.chk input{width:auto}
-@media (max-width:640px){.grid{grid-template-columns:1fr}.grid .full{grid-column:1}.col-hide{display:none}}
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:10px}
+.chk{display:flex;align-items:center;gap:8px}.chk input{width:auto}
+.hint{font-size:.78rem;color:var(--muted)}
+@media (max-width:640px){.grid{grid-template-columns:1fr}.grid .full{grid-column:1}.hidem{display:none}}
 </style>
 </head>
 <body>
@@ -52,142 +50,186 @@ label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
 <div id="loginView" class="login" style="display:none">
   <h2>Admin sign in</h2>
   <div id="loginMsg" class="msg"></div>
-  <form id="loginForm">
-    <label>Password</label>
-    <input type="password" id="pw" autocomplete="current-password" required />
-    <div style="height:12px"></div>
-    <button class="primary" style="width:100%" type="submit">Sign in</button>
-  </form>
-  <p class="hint">The password is set by the <code>ADMIN_PASSWORD</code> environment variable in Vercel.</p>
+  <form id="loginForm"><label>Password</label><input type="password" id="pw" required />
+  <div style="height:12px"></div><button class="primary" style="width:100%" type="submit">Sign in</button></form>
 </div>
 
 <div id="adminView" class="wrap" style="display:none">
   <div class="topbar">
-    <h1>Case editor — 2026 High Court</h1>
-    <div style="display:flex;gap:10px">
-      <a href="/" style="align-self:center">← Public view</a>
-      <button id="logout">Log out</button>
+    <h1>Admin — Maldives Judgments</h1>
+    <div style="display:flex;gap:10px;align-items:center">
+      <a href="/">← Public site</a><button id="logout">Log out</button>
     </div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-tab="cases">Cases</div>
+    <div class="tab" data-tab="judges">Judges</div>
   </div>
   <div id="msg" class="msg"></div>
-  <div class="bar">
-    <button class="primary" id="addBtn">+ Add case</button>
-    <input type="search" id="q" placeholder="Filter…" />
-    <span id="count" class="lock"></span>
+
+  <!-- CASES -->
+  <div id="tab-cases">
+    <div class="bar">
+      <button class="primary" id="addCase">+ Add case</button>
+      <input type="search" id="cq" placeholder="Filter cases…" />
+      <span id="cCount" class="hint"></span>
+    </div>
+    <div id="caseTable"></div>
+    <div class="pager" id="casePager"></div>
   </div>
-  <div id="tablewrap"></div>
+
+  <!-- JUDGES -->
+  <div id="tab-judges" style="display:none">
+    <div class="bar"><button class="primary" id="addJudge">+ Add judge</button>
+      <span class="hint">Renaming a judge can update every case at once.</span></div>
+    <div id="judgeTable"></div>
+  </div>
 </div>
 
-<div class="overlay" id="overlay">
-  <div class="modal">
-    <h3 id="modalTitle">Edit case</h3>
-    <div class="grid">
-      <div><label>Case number *</label><input id="f_caseno" /></div>
-      <div><label>Date concluded (YYYY-MM-DD)</label><input id="f_date" placeholder="2026-01-31" /></div>
-      <div><label>Presiding judge (English)</label><input id="f_pen" /></div>
-      <div><label>Presiding judge (Dhivehi)</label><input id="f_pdv" class="thaana" /></div>
-      <div class="full"><label>Full bench</label><input id="f_bench" placeholder="Judge A; Judge B (presiding); Judge C" /></div>
-      <div class="full"><label>Disposition</label><textarea id="f_disp" rows="2"></textarea></div>
-      <div><label>Source</label>
-        <select id="f_source">
-          <option value="manual">Manual</option>
-          <option value="text">Judgment text</option>
-          <option value="OCR-high">OCR · high</option>
-          <option value="OCR-med">OCR · med</option>
-          <option value="needs-review">Needs review</option>
-          <option value="unresolved">Unresolved</option>
-        </select>
-      </div>
-      <div><label>Original judgment PDF URL</label><input id="f_pdf" placeholder="https://highcourt.gov.mv/dhi/mediamanager/…" /></div>
-      <div class="full chk"><input type="checkbox" id="f_locked" /><label style="margin:0">Locked — protect this row from the daily auto-update</label></div>
-    </div>
-    <div class="foot">
-      <button class="danger" id="deleteBtn" style="visibility:hidden">Delete</button>
-      <div style="display:flex;gap:10px">
-        <button id="cancelBtn">Cancel</button>
-        <button class="primary" id="saveBtn">Save</button>
-      </div>
-    </div>
+<!-- Case modal -->
+<div class="overlay" id="cOverlay"><div class="modal">
+  <h3 id="cTitle">Edit case</h3>
+  <div class="grid">
+    <div><label>Case number *</label><input id="c_caseno" /></div>
+    <div><label>Date concluded (YYYY-MM-DD)</label><input id="c_date" placeholder="2026-01-31" /></div>
+    <div><label>Presiding judge</label><select id="c_pjudge"></select></div>
+    <div><label>Presiding (Dhivehi)</label><input id="c_pdv" class="thaana" /></div>
+    <div class="full"><label>Full bench</label><input id="c_bench" placeholder="Judge A; Judge B (presiding); Judge C" /></div>
+    <div class="full"><label>Disposition</label><textarea id="c_disp" rows="2"></textarea></div>
+    <div><label>Source</label><select id="c_source">
+      <option value="manual">Manual</option><option value="text">Judgment text</option>
+      <option value="OCR-high">OCR · high</option><option value="OCR-med">OCR · med</option>
+      <option value="needs-review">Needs review</option><option value="unresolved">Unresolved</option></select></div>
+    <div><label>Original PDF URL</label><input id="c_pdf" /></div>
+    <div class="full"><label>Full text (searchable & copyable)</label><textarea id="c_text" rows="8" class="thaana"></textarea></div>
+    <div class="full chk"><input type="checkbox" id="c_locked" /><label style="margin:0">Locked — protect from the daily auto-update</label></div>
   </div>
-</div>
+  <div class="foot">
+    <button class="danger" id="cDelete" style="visibility:hidden">Delete</button>
+    <div style="display:flex;gap:10px"><button id="cCancel">Cancel</button><button class="primary" id="cSave">Save</button></div>
+  </div>
+</div></div>
+
+<!-- Judge modal -->
+<div class="overlay" id="jOverlay"><div class="modal">
+  <h3 id="jTitle">Edit judge</h3>
+  <div class="grid">
+    <div><label>Name (English) *</label><input id="j_en" /></div>
+    <div><label>Name (Dhivehi)</label><input id="j_dv" class="thaana" /></div>
+    <div class="full chk"><input type="checkbox" id="j_active" checked /><label style="margin:0">Active (show in filters/dropdowns)</label></div>
+    <div class="full chk"><input type="checkbox" id="j_apply" /><label style="margin:0">Also rename this judge across all existing cases</label></div>
+  </div>
+  <div class="foot">
+    <button class="danger" id="jDelete" style="visibility:hidden">Delete</button>
+    <div style="display:flex;gap:10px"><button id="jCancel">Cancel</button><button class="primary" id="jSave">Save</button></div>
+  </div>
+</div></div>
 
 <script>
-let ROWS=[], editing=null;
 const $=id=>document.getElementById(id);
 function esc(s){return (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
-function flash(el,txt,ok){el.className='msg '+(ok?'ok':'err');el.textContent=txt;setTimeout(()=>{el.className='msg';},4000);}
+function flash(el,t,ok){el.className='msg '+(ok?'ok':'err');el.textContent=t;setTimeout(()=>el.className='msg',4000);}
+let JUDGES=[], editingCase=null, editingJudge=null;
+let cstate={q:'',page:1,pageSize:50,total:0};
 
 async function boot(){
   const s=await (await fetch('/api/session')).json();
-  if(s.authed){ $('adminView').style.display='';$('loginView').style.display='none'; await load(); }
-  else { $('loginView').style.display='';$('adminView').style.display='none'; }
+  if(s.authed){$('adminView').style.display='';$('loginView').style.display='none';await loadJudges();await loadCases();}
+  else{$('loginView').style.display='';$('adminView').style.display='none';}
 }
-$('loginForm').onsubmit=async e=>{
-  e.preventDefault();
+$('loginForm').onsubmit=async e=>{e.preventDefault();
   const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:$('pw').value})});
-  if(r.ok){ boot(); } else { const j=await r.json().catch(()=>({})); flash($('loginMsg'), j.error||'Login failed', false); }
-};
-$('logout').onclick=async()=>{ await fetch('/api/logout',{method:'POST'}); boot(); };
+  if(r.ok)boot();else flash($('loginMsg'),'Incorrect password',false);};
+$('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST'});boot();};
 
-async function load(){
-  const j=await (await fetch('/api/cases')).json();
-  ROWS=j.cases||[]; render();
-}
-function render(){
-  const term=$('q').value.trim().toLowerCase();
-  let r=ROWS.slice();
-  if(term)r=r.filter(x=>(x.caseno+' '+x.presiding_en+' '+x.presiding_dv+' '+x.bench+' '+x.source).toLowerCase().includes(term));
-  r.sort((a,b)=>(a.date_concluded<b.date_concluded?1:-1));
-  const head=`<table><thead><tr><th>Case No</th><th>Date</th><th>Presiding</th><th class="col-hide">ފަނޑިޔާރު</th><th class="col-hide">Source</th><th>Lock</th><th>PDF</th><th>Actions</th></tr></thead><tbody>`;
-  const body=r.map(x=>`<tr>
-    <td>${esc(x.caseno)}</td><td>${esc(x.date_concluded)}</td>
-    <td>${esc(x.presiding_en)}</td><td class="thaana col-hide">${esc(x.presiding_dv)}</td>
-    <td class="col-hide">${esc(x.source)}</td><td>${x.locked?'🔒':'—'}</td>
-    <td>${x.pdf_url?`<a href="${esc(x.pdf_url)}" target="_blank" rel="noopener">↗</a>`:'—'}</td>
-    <td class="actions"><button data-edit="${x.id}">Edit</button></td>
-  </tr>`).join('');
-  $('tablewrap').innerHTML=head+body+'</tbody></table>';
-  $('count').textContent=`${r.length} of ${ROWS.length}`;
-  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEdit(ROWS.find(z=>z.id==b.dataset.edit)));
-}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');
+  $('tab-cases').style.display=t.dataset.tab==='cases'?'':'none';
+  $('tab-judges').style.display=t.dataset.tab==='judges'?'':'none';
+});
 
-function openEdit(row){
-  editing=row||null;
-  $('modalTitle').textContent=row?'Edit case':'Add case';
-  $('f_caseno').value=row?row.caseno:''; $('f_date').value=row?row.date_concluded:'';
-  $('f_pen').value=row?row.presiding_en:''; $('f_pdv').value=row?row.presiding_dv:'';
-  $('f_bench').value=row?row.bench:''; $('f_disp').value=row?row.disposition:'';
-  $('f_source').value=row?row.source:'manual'; $('f_pdf').value=row?row.pdf_url:'';
-  $('f_locked').checked=row?!!row.locked:true;
-  $('deleteBtn').style.visibility=row?'visible':'hidden';
-  $('overlay').classList.add('open');
+/* ---------- Cases ---------- */
+function cqs(){const p=new URLSearchParams();p.set('page',cstate.page);p.set('pageSize',cstate.pageSize);if(cstate.q)p.set('q',cstate.q);return p.toString();}
+async function loadCases(){
+  const r=await (await fetch('/api/cases?'+cqs())).json();cstate.total=r.total||0;
+  const rows=r.cases||[];
+  const head=`<table><thead><tr><th>Case No</th><th>Date</th><th>Type</th><th>Presiding</th><th>Src</th><th>Text</th><th>Lock</th><th></th></tr></thead><tbody>`;
+  $('caseTable').innerHTML=head+rows.map(x=>`<tr>
+    <td>${esc(x.caseno)}</td><td>${esc(x.date_concluded)}</td><td>${esc(x.case_type||'')}</td>
+    <td>${esc(x.presiding_en)}</td><td>${esc(x.source||'')}</td><td>${x.has_text?'✓':'—'}</td><td>${x.locked?'🔒':'—'}</td>
+    <td class="actions"><button data-edit="${x.id}">Edit</button></td></tr>`).join('')+'</tbody></table>';
+  $('cCount').textContent=`${cstate.total} cases`;
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=async()=>{
+    const j=await (await fetch('/api/cases?id='+b.dataset.edit)).json();openCase(j.case);});
+  const pages=Math.max(1,Math.ceil(cstate.total/cstate.pageSize));
+  $('casePager').innerHTML=`<button ${cstate.page<=1?'disabled':''} id="cprev">‹ Prev</button><span class="hint">Page ${cstate.page} of ${pages}</span><button ${cstate.page>=pages?'disabled':''} id="cnext">Next ›</button>`;
+  if($('cprev'))$('cprev').onclick=()=>{if(cstate.page>1){cstate.page--;loadCases();}};
+  if($('cnext'))$('cnext').onclick=()=>{const p=Math.ceil(cstate.total/cstate.pageSize);if(cstate.page<p){cstate.page++;loadCases();}};
 }
-$('addBtn').onclick=()=>openEdit(null);
-$('cancelBtn').onclick=()=>$('overlay').classList.remove('open');
-$('overlay').onclick=e=>{ if(e.target===$('overlay')) $('overlay').classList.remove('open'); };
+let ct;$('cq').oninput=()=>{clearTimeout(ct);ct=setTimeout(()=>{cstate.q=$('cq').value.trim();cstate.page=1;loadCases();},300);};
 
-$('saveBtn').onclick=async()=>{
-  const payload={
-    caseno:$('f_caseno').value.trim(), date_concluded:$('f_date').value.trim(),
-    presiding_en:$('f_pen').value.trim(), presiding_dv:$('f_pdv').value.trim(),
-    bench:$('f_bench').value.trim(), disposition:$('f_disp').value.trim(),
-    source:$('f_source').value, pdf_url:$('f_pdf').value.trim(), locked:$('f_locked').checked
-  };
-  if(!payload.caseno){ flash($('msg'),'Case number is required',false); return; }
-  let r;
-  if(editing){ payload.id=editing.id; r=await fetch('/api/cases',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(payload)}); }
-  else { r=await fetch('/api/cases',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)}); }
-  if(r.ok){ $('overlay').classList.remove('open'); await load(); flash($('msg'),'Saved.',true); }
-  else { const j=await r.json().catch(()=>({})); flash($('msg'), j.error||'Save failed', false); }
+function fillJudgeSelect(sel,val){
+  sel.innerHTML='<option value="">— none —</option>'+JUDGES.map(j=>`<option value="${esc(j.name_en)}">${esc(j.name_en)}</option>`).join('')+'<option value="__other">(other / free text)</option>';
+  if(val&&!JUDGES.some(j=>j.name_en===val)){const o=document.createElement('option');o.value=val;o.textContent=val;sel.appendChild(o);}
+  sel.value=val||'';
+}
+function openCase(row){
+  editingCase=row||null;
+  $('cTitle').textContent=row?'Edit case':'Add case';
+  $('c_caseno').value=row?row.caseno:'';$('c_date').value=row?row.date_concluded:'';
+  fillJudgeSelect($('c_pjudge'),row?row.presiding_en:'');
+  $('c_pdv').value=row?row.presiding_dv:'';$('c_bench').value=row?row.bench:'';
+  $('c_disp').value=row?row.disposition:'';$('c_source').value=row?row.source:'manual';
+  $('c_pdf').value=row?row.pdf_url:'';$('c_text').value=row?(row.full_text||''):'';
+  $('c_locked').checked=row?!!row.locked:true;
+  $('cDelete').style.visibility=row?'visible':'hidden';
+  $('cOverlay').classList.add('open');
+}
+$('c_pjudge').onchange=()=>{const v=$('c_pjudge').value;if(v==='__other'){$('c_pjudge').value='';return;}const j=JUDGES.find(x=>x.name_en===v);if(j&&!$('c_pdv').value)$('c_pdv').value=j.name_dv||'';};
+$('addCase').onclick=()=>openCase(null);
+$('cCancel').onclick=()=>$('cOverlay').classList.remove('open');
+$('cOverlay').onclick=e=>{if(e.target===$('cOverlay'))$('cOverlay').classList.remove('open');};
+$('cSave').onclick=async()=>{
+  const p={caseno:$('c_caseno').value.trim(),date_concluded:$('c_date').value.trim(),
+    presiding_en:($('c_pjudge').value==='__other'?'':$('c_pjudge').value),presiding_dv:$('c_pdv').value.trim(),
+    bench:$('c_bench').value.trim(),disposition:$('c_disp').value.trim(),source:$('c_source').value,
+    pdf_url:$('c_pdf').value.trim(),full_text:$('c_text').value,locked:$('c_locked').checked};
+  if(!p.caseno){flash($('msg'),'Case number required',false);return;}
+  let r;if(editingCase){p.id=editingCase.id;r=await fetch('/api/cases',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(p)});}
+  else r=await fetch('/api/cases',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(p)});
+  if(r.ok){$('cOverlay').classList.remove('open');loadCases();flash($('msg'),'Saved.',true);}else{const j=await r.json().catch(()=>({}));flash($('msg'),j.error||'Save failed',false);}
 };
-$('deleteBtn').onclick=async()=>{
-  if(!editing) return;
-  if(!confirm('Delete '+editing.caseno+'? This cannot be undone.')) return;
-  const r=await fetch('/api/cases',{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({id:editing.id})});
-  if(r.ok){ $('overlay').classList.remove('open'); await load(); flash($('msg'),'Deleted.',true); }
-  else { flash($('msg'),'Delete failed',false); }
+$('cDelete').onclick=async()=>{if(!editingCase)return;if(!confirm('Delete '+editingCase.caseno+'?'))return;
+  const r=await fetch('/api/cases',{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({id:editingCase.id})});
+  if(r.ok){$('cOverlay').classList.remove('open');loadCases();flash($('msg'),'Deleted.',true);}};
+
+/* ---------- Judges ---------- */
+async function loadJudges(){
+  const j=await (await fetch('/api/judges')).json();JUDGES=j.judges||[];
+  const head=`<table><thead><tr><th>Name (English)</th><th>ދިވެހި</th><th>Active</th><th></th></tr></thead><tbody>`;
+  $('judgeTable').innerHTML=head+JUDGES.map(x=>`<tr><td>${esc(x.name_en)}</td><td class="thaana">${esc(x.name_dv)}</td><td>${x.active?'✓':'—'}</td>
+    <td class="actions"><button data-jedit="${x.id}">Edit</button></td></tr>`).join('')+'</tbody></table>';
+  document.querySelectorAll('[data-jedit]').forEach(b=>b.onclick=()=>openJudge(JUDGES.find(z=>z.id==b.dataset.jedit)));
+}
+function openJudge(row){editingJudge=row||null;$('jTitle').textContent=row?'Edit judge':'Add judge';
+  $('j_en').value=row?row.name_en:'';$('j_dv').value=row?row.name_dv:'';$('j_active').checked=row?!!row.active:true;$('j_apply').checked=false;
+  $('jDelete').style.visibility=row?'visible':'hidden';$('jOverlay').classList.add('open');}
+$('addJudge').onclick=()=>openJudge(null);
+$('jCancel').onclick=()=>$('jOverlay').classList.remove('open');
+$('jOverlay').onclick=e=>{if(e.target===$('jOverlay'))$('jOverlay').classList.remove('open');};
+$('jSave').onclick=async()=>{
+  const p={name_en:$('j_en').value.trim(),name_dv:$('j_dv').value.trim(),active:$('j_active').checked,applyToCases:$('j_apply').checked};
+  if(!p.name_en){flash($('msg'),'English name required',false);return;}
+  let r;if(editingJudge){p.id=editingJudge.id;r=await fetch('/api/judges',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(p)});}
+  else r=await fetch('/api/judges',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(p)});
+  if(r.ok){const j=await r.json().catch(()=>({}));$('jOverlay').classList.remove('open');await loadJudges();await loadCases();
+    flash($('msg'),'Saved.'+(j.propagated?(' Updated '+j.propagated+' case fields.'):''),true);}
+  else{const j=await r.json().catch(()=>({}));flash($('msg'),j.error||'Save failed',false);}
 };
-$('q').oninput=render;
+$('jDelete').onclick=async()=>{if(!editingJudge)return;if(!confirm('Delete judge '+editingJudge.name_en+'? (Cases keep their text.)'))return;
+  const r=await fetch('/api/judges',{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({id:editingJudge.id})});
+  if(r.ok){$('jOverlay').classList.remove('open');loadJudges();flash($('msg'),'Deleted.',true);}};
+
 boot();
 </script>
 </body></html>

@@ -1,115 +1,102 @@
-# High Court of Maldives — Presiding Judges (2026)
+# Maldives High Court Judgments — search app
 
-A small full-stack app on Vercel:
+A full-stack app on Vercel:
 
-- **Public page** (`/`) — searchable / sortable table of every 2026 High Court
-  judgment, its presiding judge (ރިޔާސަތު), the full bench, and a **View** link to
-  the original judgment PDF. Downloads to CSV/JSON.
-- **Admin page** (`/admin`) — password-protected. Add, edit, and delete cases.
-- **Daily auto-update** — a GitHub Actions job re-checks the court's decisions list
-  on a schedule you control and adds any new cases (flagged *Needs review*).
-- **Database** — Vercel Postgres. Seeded once with the 133 curated 2026 cases
-  (95 from judgment text + 38 from OCR). Every seeded row is **locked**, so the daily
-  update can never overwrite your curated data or your manual edits.
+- **Public site** (`/`) — full-text **search** across judgments (English or Dhivehi) with
+  filters for **year, type, judge, keyword** and source. Each result shows a highlighted
+  snippet, a **Read** panel to view and **copy** the text, and a **View** link to the
+  original PDF.
+- **Admin** (`/admin`, password-protected) — add / edit / delete cases (with a full-text
+  field), and a **Judges** tab to add, edit, or **rename a judge across every case** at once.
+- **Auto-update** — GitHub Actions enumerates the court's decisions list on a schedule you
+  set and adds new judgments; a second workflow extracts judgment text.
+- **Database** — Vercel Postgres (Neon). Seeded with the 133 curated 2026 cases; those rows
+  are **locked** so the crawler never overwrites your work.
 
-Stack: static HTML/JS frontend + Node serverless functions in `/api` + `@vercel/postgres`.
-No framework build step.
-
----
-
-## Deploy (about 10 minutes)
-
-### 1. Put the code on GitHub
-Create a new repo at <https://github.com/new> (empty). Then either drag every file in
-this folder into GitHub's "uploading an existing file" box, or:
-
-```bash
-git init && git add . && git commit -m "HC 2026 judges app"
-git branch -M main
-git remote add origin https://github.com/<you>/hc-judges.git
-git push -u origin main
-```
-
-### 2. Import into Vercel
-Go to <https://vercel.com/new>, import the repo. Framework preset **Other**, leave
-build settings empty. Click **Deploy**. (The first deploy will error until the
-database is attached — that's expected; finish step 3 then redeploy.)
-
-### 3. Attach a Postgres database
-In the Vercel project → **Storage → Create Database → Postgres** → connect it to this
-project. Vercel injects the `POSTGRES_*` env vars automatically. No code changes.
-
-### 4. Set environment variables
-Project → **Settings → Environment Variables**, add (Production + Preview):
-
-| Name             | Value                                             |
-|------------------|---------------------------------------------------|
-| `ADMIN_PASSWORD` | the password you'll use to log into `/admin`      |
-| `CRON_SECRET`    | a long random string (used by the daily job)      |
-
-Then **Deployments → … → Redeploy** the latest deployment.
-
-On first load the app creates the table and seeds it with the 134 rows in
-`data/seed.json`. Visit your URL — the public table should be populated, and
-`/admin` should let you log in.
-
-### 5. Turn on the daily update (GitHub Actions)
-In the **GitHub repo → Settings → Secrets and variables → Actions**:
-
-- **Secrets** tab → add:
-  - `SITE_URL` = your live URL, no trailing slash (e.g. `https://hc-judges.vercel.app`)
-  - `CRON_SECRET` = the exact same value you set in Vercel
-- **Variables** tab (optional) → `TARGET_YEAR` = `2026` (defaults to the current year)
-
-The schedule lives in `.github/workflows/update.yml`. The default is **06:00 Maldives
-time daily**; edit the `cron:` line to change the time or frequency (examples are in
-the file; <https://crontab.guru> helps). You can also run it any time from the repo's
-**Actions** tab → *Daily update* → *Run workflow*.
+Stack: static HTML/JS + Node serverless functions in `/api` + `@vercel/postgres`. No build step.
 
 ---
 
-## How updates and edits coexist
+## First-time deploy
 
-- Every seeded/curated row is **locked** (🔒 in the admin table). The daily scraper
-  **never** changes a locked row — it only inserts brand-new cases.
-- New cases arrive as **Needs review** (the presiding judge on a scanned judgment
-  can't be read automatically). Open `/admin`, fill in the presiding judge from the
-  **View** PDF link, and save — saving marks the row Manual and locks it.
-- To let the scraper auto-refresh a specific row, open it in admin and untick
-  **Locked**.
-- The scraper attempts to read the presiding judge from judgments that have a text
-  layer; scanned ones are left for review. (This best-effort text read is conservative
-  and can be improved over time — see `scripts/scrape.py`.)
+1. **Push to GitHub**, then import at <https://vercel.com/new> (framework **Other**, no build settings).
+2. **Attach Postgres**: project → **Storage → Create → Neon Postgres → Connect** to the project
+   (all environments). This injects `POSTGRES_URL`. If your project has leftover `POSTGRES_*`
+   variables from an old database, remove that old connection first so the new one uses the
+   default names.
+3. **Env vars** (Settings → Environment Variables): `ADMIN_PASSWORD` and `CRON_SECRET`.
+4. **Redeploy** (Deployments → ⋯ → Redeploy). On first load the app creates the tables,
+   runs migrations, seeds the 2026 cases and the judges list.
+5. **GitHub → Settings → Secrets and variables → Actions → Secrets**: add `SITE_URL`
+   (your live URL, no trailing slash) and `CRON_SECRET` (same value as in Vercel).
 
-## Editing content
-`/admin` → **Add case** or **Edit**. Fields: case number, date, presiding judge
-(English + Dhivehi), full bench, disposition, source, original PDF URL, and the Lock
-toggle. Delete is on the edit dialog.
+> Upgrading an existing deployment? Just replace the files and redeploy — the database
+> migrates itself (adds the `full_text`, `year`, `type`, `text_tried` columns and the
+> `judges` table; existing rows are backfilled and preserved).
 
-## Local development (optional)
-```bash
-npm i -g vercel
-vercel link
-vercel env pull .env.local     # pulls Postgres + your env vars
-vercel dev                     # http://localhost:3000
-```
+---
+
+## Load the whole High Court library
+
+Everything comes from the court's **public** website, so your `D:\judgements` drive is not
+needed.
+
+1. **Enumerate all judgments** (metadata): GitHub repo → **Actions** → **Daily update
+   (enumerate)** → **Run workflow**, leave *target year* blank → Run. This adds every High
+   Court judgment (all years) as a row. New rows are flagged **Needs review** until they have
+   a presiding judge. (After this, the daily schedule keeps catching new cases automatically.)
+2. **Extract the text**: **Actions** → **Backfill judgment text** → **Run workflow**. It
+   downloads judgment PDFs and pulls the text layer. Scanned PDFs have no text and are skipped
+   (marked so they aren't retried). Each run works for ~50 minutes; **re-run it until the log
+   says nothing is pending.** A weekly scheduled pass then keeps new judgments' text current.
+
+Only text-layer PDFs become content-searchable and copyable; scanned judgments stay
+searchable by metadata and open via **View**.
+
+---
+
+## Using it
+
+**Search** — type in the box (matches case text, principles, names, keywords in English or
+Thaana). Narrow with the year / type / judge / source dropdowns. Click **Read** to open the
+judgment text and **Copy text**, or **View** for the original PDF.
+
+**Admin → Cases** — add or edit any case. The presiding judge is a dropdown from your judges
+list (or free text). Paste or edit the **Full text** to make a judgment searchable. **Locked**
+protects a row from the daily crawler.
+
+**Admin → Judges** — add or edit judges (English + Dhivehi). When you rename a judge, tick
+**"Also rename across all existing cases"** and every judgment's presiding/bench text updates
+in one go — the clean way to normalise spellings.
+
+---
+
+## Environment variables
+
+| Name             | Where            | Purpose                                             |
+|------------------|------------------|-----------------------------------------------------|
+| `ADMIN_PASSWORD` | Vercel           | Password for `/admin`                               |
+| `CRON_SECRET`    | Vercel + GitHub  | Shared secret for the crawler's `/api/ingest`       |
+| `POSTGRES_URL`   | Vercel (auto)    | Added when you connect the Neon database            |
+| `SITE_URL`       | GitHub secret    | Your live URL, no trailing slash                    |
 
 ## Files
 ```
-index.html              public page
-admin.html              admin page (/admin)
-api/                    serverless functions
-  cases.js              GET list (public) · POST/PUT/DELETE (admin)
-  login.js  logout.js   admin session
-  session.js            auth check for the admin UI
-  ingest.js             upsert endpoint for the daily job (Bearer CRON_SECRET)
-lib/                    db.js (schema, queries, seed) · auth.js (sessions)
-data/seed.json          the 134 curated 2026 cases
-scripts/scrape.py       the daily scraper
-.github/workflows/update.yml   the schedule
-vercel.json             function config
+index.html            public search page
+admin.html            admin (/admin): Cases + Judges tabs
+api/
+  cases.js            GET search/list + single (with full_text); POST/PUT/DELETE (admin)
+  judges.js           judges CRUD + rename-propagation
+  meta.js             filter facets (years, types, judges, counts)
+  ingest.js           bulk upsert for the crawler (Bearer CRON_SECRET)
+  pending.js          lists cases still needing text (Bearer CRON_SECRET)
+  login/logout/session
+lib/db.js             schema, migrations, search, judges, seed
+lib/auth.js           admin session + cron auth
+data/seed.json        the 134 curated 2026 cases
+scripts/scrape.py     crawler (MODE=enumerate | text)
+.github/workflows/    update.yml (daily enumerate) · backfill-text.yml (text)
 ```
 
----
-OCR-derived and *Needs review* rows should be verified against the original judgment
-before being relied on in filings.
+OCR / *Needs review* rows should be verified against the original judgment before relying on
+them in filings.

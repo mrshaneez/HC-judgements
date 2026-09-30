@@ -1,36 +1,29 @@
-import { listCases, getCase, createCase, updateCase, deleteCase } from '../lib/db.js';
+import { listJudges, createJudge, updateJudge, deleteJudge } from '../lib/db.js';
 import { isAuthed } from '../lib/auth.js';
 
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       res.setHeader('Cache-Control', 'no-store');
-      const { id, caseno } = req.query;
-      if (id || caseno) {
-        const row = await getCase(id || caseno);
-        if (!row) return res.status(404).json({ error: 'Not found' });
-        return res.status(200).json({ case: row });   // includes full_text
-      }
-      const { q = '', year = '', type = '', judge = '', source = '', page = '1', pageSize = '50' } = req.query;
-      const out = await listCases({ q, year, type, judge, source, page, pageSize });
-      return res.status(200).json(out);
+      return res.status(200).json({ judges: await listJudges() });   // public (for dropdowns/filters)
     }
-
     if (!isAuthed(req)) return res.status(401).json({ error: 'Not authenticated' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
 
     if (req.method === 'POST') {
-      if (!body.caseno) return res.status(400).json({ error: 'caseno required' });
-      return res.status(200).json({ case: await createCase(body) });
+      if (!body.name_en) return res.status(400).json({ error: 'name_en required' });
+      return res.status(200).json({ judge: await createJudge(body) });
     }
     if (req.method === 'PUT') {
       if (!body.id) return res.status(400).json({ error: 'id required' });
-      return res.status(200).json({ case: await updateCase(body.id, body) });
+      const out = await updateJudge(body.id, body, !!body.applyToCases);
+      if (!out) return res.status(404).json({ error: 'Not found' });
+      return res.status(200).json(out);   // { judge, propagated }
     }
     if (req.method === 'DELETE') {
       const id = body.id || req.query.id;
       if (!id) return res.status(400).json({ error: 'id required' });
-      await deleteCase(id);
+      await deleteJudge(id);
       return res.status(200).json({ ok: true });
     }
     return res.status(405).json({ error: 'Method not allowed' });

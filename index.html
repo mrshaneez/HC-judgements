@@ -99,7 +99,7 @@ async function loadMeta(){
   const m=await (await fetch('/api/meta')).json();
   const y=$('fyear');(m.years||[]).forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;y.appendChild(o);});
   const t=$('ftype');(m.types||[]).forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=TYPE[v]||('HC-'+v);t.appendChild(o);});
-  const j=$('fjudge');(m.judges||[]).forEach(v=>{const o=document.createElement('option');o.value=v.name_en;o.textContent=v.name_en;j.appendChild(o);});
+  const j=$('fjudge');(m.judges||[]).forEach(v=>{const o=document.createElement('option');o.value=v.name_en;o.textContent=(v.count!=null)?`${v.name_en} (${v.count})`:v.name_en;j.appendChild(o);});
   $('stats').innerHTML=
     `<div class="stat"><b>${m.total??'—'}</b><span>Judgments</span></div>`+
     `<div class="stat"><b>${m.withText??'—'}</b><span>Full-text searchable</span></div>`+
@@ -127,7 +127,7 @@ function render(rows){
       <td class="act">${read}${view}</td></tr>`;
   }).join('');
   $('tablewrap').innerHTML=head+body+'</tbody></table>';
-  $('count').textContent=`${state.total} result${state.total===1?'':'s'}`;
+  $('count').textContent=state.judge?`${state.total} case${state.total===1?'':'s'} concluded by ${state.judge}`:`${state.total} result${state.total===1?'':'s'}`;
   document.querySelectorAll('[data-read]').forEach(b=>b.onclick=()=>openReader(b.dataset.read));
 }
 function renderPager(){

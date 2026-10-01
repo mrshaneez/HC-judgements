@@ -1,0 +1,28 @@
+name: Backfill judgment text
+
+# Downloads judgment PDFs that don't have text yet and extracts the text layer.
+# Scanned PDFs (no text) are marked "tried" and skipped next time.
+# Run this manually from the Actions tab for the one-time backfill (re-run until
+# it reports nothing pending). A light weekly pass keeps new judgments covered.
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 2 * * 0"   # Sundays 07:00 Maldives — top up any new text
+
+jobs:
+  text:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pypdf
+      - name: Extract & post text
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          MODE: text
+          BATCH: "40"
+          TIME_BUDGET_SEC: "3000"
+        run: python scripts/scrape.py

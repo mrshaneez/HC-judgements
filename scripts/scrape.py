@@ -1,154 +1,167 @@
 #!/usr/bin/env python3
 """
-Daily scraper for the High Court of Maldives decisions list.
+Scraper for the High Court of Maldives decisions list. Two modes.
 
-What it does
-------------
-1. Loads highcourt.gov.mv/dv/decisions.php with a headless browser and reads every
-   judgment link (…/mediamanager/<basename>.pdf) across all pages.
-2. Keeps the ones whose timestamp (encoded in the filename) is in TARGET_YEAR.
-3. Builds a row per case: case number, date concluded, and the PDF URL.
-4. (Optional, best-effort) tries to read the presiding judge from the PDF's text
-   layer. Scanned judgments have no text layer, so those are left as "needs-review".
-5. POSTs the rows to <SITE_URL>/api/ingest with the CRON_SECRET.
-   The server NEVER overwrites a locked row, so your curated 2026 seed and any manual
-   edits are safe. Only genuinely new cases are added (flagged "needs-review" until a
-   human or Claude fills the presiding judge).
+MODE=enumerate  (default)
+  Loads highcourt.gov.mv/dv/decisions.php with a headless browser, walks every
+  page, and collects every judgment link (…/mediamanager/<basename>.pdf).
+  Derives case number, date, year and type, and upserts the METADATA into the
+  app (POST /api/ingest). No text is fetched — fast. Runs daily.
+  Set TARGET_YEAR to limit to one year; leave empty to ingest ALL years.
 
-Env vars (set by the GitHub Action):
-  SITE_URL      e.g. https://hc-judges.vercel.app   (no trailing slash)
-  CRON_SECRET   shared secret, also set in Vercel project env
-  TARGET_YEAR   default: current year
-  DECISIONS_URL default: https://highcourt.gov.mv/dv/decisions.php
+MODE=text
+  Asks the app which cases still need text (GET /api/pending), downloads those
+  PDFs, extracts the text layer with pypdf (scanned PDFs yield nothing and are
+  skipped), and posts the text back (POST /api/ingest). Loops until nothing is
+  pending or TIME_BUDGET_SEC is hit. Run this for the one-time backfill and
+  occasionally after that.
 
-Selectors marked  # ADJUST  may need a tweak if the court site's markup changes;
-check the first Action run's logs.
+Env (from the GitHub Action):
+  SITE_URL        https://your-app  (no trailing slash)
+  CRON_SECRET     shared secret, also set in the Vercel project
+  MODE            enumerate | text          (default: enumerate)
+  TARGET_YEAR     e.g. 2026                 (enumerate only; empty = all years)
+  BATCH           cases per pending pull     (text mode, default 40)
+  TIME_BUDGET_SEC wall-clock budget          (text mode, default 3000)
+  DECISIONS_URL   default decisions.php
+
+Selectors marked  # ADJUST  may need a tweak if the court site markup changes;
+check the first run's logs.
 """
-import os, re, sys, io, json, datetime, urllib.request
-from playwright.sync_api import sync_playwright
+import os, re, io, sys, json, time, datetime, urllib.request
 
-SITE_URL   = os.environ.get("SITE_URL", "").rstrip("/")
-CRON_SECRET= os.environ.get("CRON_SECRET", "")
-TARGET_YEAR= os.environ.get("TARGET_YEAR", str(datetime.date.today().year))
-DECISIONS  = os.environ.get("DECISIONS_URL", "https://highcourt.gov.mv/dv/decisions.php")
-TRY_TEXT   = os.environ.get("TRY_PDF_TEXT", "1") == "1"
+SITE_URL    = os.environ.get("SITE_URL", "").rstrip("/")
+CRON_SECRET = os.environ.get("CRON_SECRET", "")
+MODE        = os.environ.get("MODE", "enumerate").strip().lower()
+TARGET_YEAR = os.environ.get("TARGET_YEAR", "").strip()
+DECISIONS   = os.environ.get("DECISIONS_URL", "https://highcourt.gov.mv/dv/decisions.php")
+DATA_URL    = os.environ.get("DATA_URL", "https://highcourt.gov.mv/dv/connects/getmydecisionsfull.php")
+PDF_BASE    = os.environ.get("PDF_BASE", "https://highcourt.gov.mv/dhi/mediamanager/")
+BATCH       = int(os.environ.get("BATCH", "40"))
+TIME_BUDGET = int(os.environ.get("TIME_BUDGET_SEC", "3000"))
 
-TS_RE   = re.compile(r"_(\d{2})(\d{2})(\d{4})\d*\.(?:pdf|PDF)$")   # _ddmmyyyyhhmmss
-CASE_RE = re.compile(r"\d{2,4}\s*/\s*HC-?[AB]\d*\s*/\s*\d+", re.I)  # displayed case number
+TS_RE   = re.compile(r"_(\d{2})(\d{2})(\d{4})\d*\.(?:pdf|PDF)$")
+CASE_RE = re.compile(r"\d{2,4}\s*/\s*HC-?[AB]\d*\s*/\s*[A-Za-z0-9]+", re.I)
 
 
-def basename_of(url):
-    return url.rstrip("/").split("/")[-1]
+def api(path, payload=None, method="POST"):
+    url = SITE_URL + path
+    data = json.dumps(payload).encode() if payload is not None else None
+    req = urllib.request.Request(url, data=data, method=method,
+        headers={"content-type": "application/json", "authorization": f"Bearer {CRON_SECRET}"})
+    return json.loads(urllib.request.urlopen(req, timeout=120).read().decode())
 
 
-def date_from_basename(bn):
+def basename_of(u): return u.rstrip("/").split("/")[-1]
+
+def date_year(bn):
     m = TS_RE.search(bn)
-    if not m:
-        return None, None
+    if not m: return "", None
     dd, mm, yyyy = m.groups()
     return f"{yyyy}-{mm}-{dd}", yyyy
 
-
 def caseno_from_basename(bn):
-    # e.g. 2022HCA188_...  -> 2022/HC-A/188 ; 2026HCB1207_... -> 2026/HC-B12/07 (best effort)
     m = re.match(r"(\d{3,4})HC([AB])(\d+)", bn)
-    if not m:
-        return None
+    if not m: return None
     yr, div, num = m.groups()
     return f"{yr}/HC-{div}/{num}"
 
 
-def extract_presiding_from_pdf(url):
-    """Best-effort: read the PDF text layer and pull the name marked (ރިޔާސަތު).
-    Returns (presiding_dv, bench_text) or (None, None) for scanned/unclear PDFs."""
+# ---------------- enumerate ----------------
+def fetch_decisions():
+    """GET the court's decisions JSON feed (the same endpoint the decisions page
+    uses to populate its DataTable). Returns a list of record dicts."""
+    req = urllib.request.Request(DATA_URL, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": DECISIONS,
+    })
+    raw = urllib.request.urlopen(req, timeout=180).read().decode("utf-8", "replace")
+    return json.loads(raw)
+
+
+def enumerate_all():
+    records = fetch_decisions()
+    rows = []
+    for r in records:
+        caseno = (r.get("numbr") or "").strip()
+        pdffile = (r.get("pdffile") or "").strip()
+        if not caseno or not pdffile:
+            continue
+        date = (r.get("created") or "").strip()          # already YYYY-MM-DD
+        yr = date[:4] if date[:4].isdigit() else None
+        if TARGET_YEAR and yr != TARGET_YEAR:
+            continue
+        rows.append({
+            "caseno": caseno,
+            "date_concluded": date,
+            "pdf_url": PDF_BASE + pdffile,
+            "court": "HC",
+            "source": "needs-review",
+            "bench": (r.get("fandiyaaru") or "").strip(),
+            "disposition": (r.get("massala") or "").strip(),
+        })
+    # de-dup by caseno (keep first)
+    uniq = {}
+    for r in rows:
+        uniq.setdefault(r["caseno"], r)
+    items = list(uniq.values())
+    print(f"fetched {len(records)} records; enumerated {len(items)} cases"
+          + (f" for {TARGET_YEAR}" if TARGET_YEAR else " (all years)"))
+    # post in chunks (kept small to stay well under the serverless time limit)
+    total = {"added": 0, "updated": 0, "skipped": 0}
+    CHUNK = 40
+    for i in range(0, len(items), CHUNK):
+        res = api("/api/ingest", {"cases": items[i:i+CHUNK]})
+        for k in total: total[k] += res.get(k, 0)
+        print("  chunk", i // CHUNK, res)
+    print("ingest totals:", total)
+
+
+# ---------------- text backfill ----------------
+def extract_text(url):
     try:
         from pypdf import PdfReader
-    except Exception:
-        return None, None
-    try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        data = urllib.request.urlopen(req, timeout=60).read()
+        data = urllib.request.urlopen(req, timeout=90).read()
         reader = PdfReader(io.BytesIO(data))
-        text = "\n".join((p.extract_text() or "") for p in reader.pages)
-    except Exception:
-        return None, None
-    if len(text.strip()) < 200:
-        return None, None  # scanned image PDF — no usable text
-    # The presiding judge's name appears next to the marker "ރިޔާސަތު".
-    idx = text.find("ރިޔާސަތު")
-    if idx == -1:
-        return None, None
-    window = text[max(0, idx - 120): idx]
-    # grab the last "ފަނޑިޔާރު <name>" chunk before the marker
-    m = list(re.finditer(r"ފަނޑިޔާރު[^\n]{0,60}", window))
-    if not m:
-        return None, None
-    return m[-1].group(0).strip(), None
+        text = "\n".join((pg.extract_text() or "") for pg in reader.pages)
+        return text if len(text.strip()) >= 200 else ""   # <200 chars => scanned/no text
+    except Exception as e:
+        print("   extract error:", e)
+        return ""
 
-
-def scrape_links():
-    urls = set()
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.goto(DECISIONS, wait_until="networkidle", timeout=90000)
-        # Try to show as many rows per page as possible (DataTables length select). # ADJUST
-        try:
-            page.select_option("select[name$='_length']", "100")
-            page.wait_for_timeout(1500)
-        except Exception:
-            pass
-        # Walk all pages via the "Next" pagination button. # ADJUST
-        seen_pages = 0
-        while True:
-            for a in page.query_selector_all("a[href*='mediamanager']"):
-                href = a.get_attribute("href") or ""
-                if "mediamanager" in href:
-                    urls.add(href if href.startswith("http") else ("https://highcourt.gov.mv" + href))
-            seen_pages += 1
-            nxt = page.query_selector("a.paginate_button.next:not(.disabled), li.next:not(.disabled) a")
-            if not nxt or seen_pages > 60:
-                break
-            try:
-                nxt.click(); page.wait_for_timeout(1200)
-            except Exception:
-                break
-        browser.close()
-    return sorted(urls)
+def backfill_text():
+    start = time.time()
+    done = 0
+    while time.time() - start < TIME_BUDGET:
+        pend = api(f"/api/pending?limit={BATCH}", method="GET").get("pending", [])
+        if not pend:
+            print("nothing pending — text backfill complete")
+            break
+        batch = []
+        for row in pend:
+            txt = extract_text(row["pdf_url"])
+            # text_tried=true marks it done either way, so scanned PDFs (empty text)
+            # leave the pending queue instead of being retried forever.
+            batch.append({"caseno": row["caseno"], "pdf_url": row["pdf_url"],
+                          "full_text": txt, "text_tried": True,
+                          "source": ("text" if txt else "needs-review")})
+        res = api("/api/ingest", {"cases": batch})
+        done += len(batch)
+        print(f"posted {len(batch)} (textSet={res.get('textSet')}), total {done}")
+    print("text backfill run finished, processed", done)
 
 
 def main():
     if not SITE_URL or not CRON_SECRET:
-        print("SITE_URL and CRON_SECRET must be set", file=sys.stderr); sys.exit(2)
-    links = scrape_links()
-    print(f"found {len(links)} judgment links")
-    rows, seen = [], set()
-    for url in links:
-        bn = basename_of(url)
-        date, yr = date_from_basename(bn)
-        if yr != TARGET_YEAR:
-            continue
-        caseno = caseno_from_basename(bn)
-        if not caseno or caseno in seen:
-            continue
-        seen.add(caseno)
-        row = {"caseno": caseno, "date_concluded": date or "", "pdf_url": url,
-               "presiding_en": "", "presiding_dv": "", "bench": "", "disposition": "",
-               "source": "needs-review"}
-        if TRY_TEXT:
-            pdv, bench = extract_presiding_from_pdf(url)
-            if pdv:
-                row["presiding_dv"] = pdv
-                row["source"] = "text"   # unlocked; a human can correct/confirm
-        rows.append(row)
-    print(f"{len(rows)} cases for {TARGET_YEAR}")
-    payload = json.dumps({"cases": rows}).encode()
-    req = urllib.request.Request(SITE_URL + "/api/ingest", data=payload, method="POST",
-                                 headers={"content-type": "application/json",
-                                          "authorization": f"Bearer {CRON_SECRET}"})
-    resp = urllib.request.urlopen(req, timeout=120).read().decode()
-    print("ingest result:", resp)
-
+        print("SITE_URL and CRON_SECRET required", file=sys.stderr); sys.exit(2)
+    if MODE == "text":
+        backfill_text()
+    else:
+        enumerate_all()
 
 if __name__ == "__main__":
     main()

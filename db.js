@@ -4,7 +4,11 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const seed = JSON.parse(readFileSync(join(__dirname, '..', 'data', 'seed.json'), 'utf8'));
+// Seed is optional — the database already holds the data after the first deploy.
+// A missing/unbundled seed.json must never crash the module at import time.
+let seed = [];
+try { seed = JSON.parse(readFileSync(join(__dirname, '..', 'data', 'seed.json'), 'utf8')); }
+catch (e) { seed = []; }
 
 // Canonical High Court judges (English + Dhivehi). Seeds the judges table.
 const JUDGE_SEED = [
@@ -43,10 +47,17 @@ export function deriveMeta(caseno = '', date = '', pdf_url = '') {
   return { year: year || null, case_type };
 }
 
+// Run a statement but never let a single idempotent-migration hiccup take down
+// the whole request. Columns/tables usually already exist, so failures here are
+// safe to log and skip.
+async function step(fn, label) {
+  try { await fn(); } catch (e) { console.error('ensureDb step failed [' + label + ']:', e.message); }
+}
+
 export async function ensureDb() {
   if (ready) return;
 
-  await sql`
+  await step(() => sql`
     CREATE TABLE IF NOT EXISTS cases (
       id            SERIAL PRIMARY KEY,
       caseno        TEXT UNIQUE NOT NULL,
@@ -59,61 +70,59 @@ export async function ensureDb() {
       pdf_url       TEXT DEFAULT '',
       locked        BOOLEAN DEFAULT FALSE,
       updated_at    TIMESTAMPTZ DEFAULT NOW()
-    );
-  `;
-  // Migrations (idempotent) for the search/library upgrade.
-  await sql`ALTER TABLE cases ADD COLUMN IF NOT EXISTS full_text TEXT DEFAULT '';`;
-  await sql`ALTER TABLE cases ADD COLUMN IF NOT EXISTS court TEXT DEFAULT 'HC';`;
-  await sql`ALTER TABLE cases ADD COLUMN IF NOT EXISTS case_type TEXT DEFAULT '';`;
-  await sql`ALTER TABLE cases ADD COLUMN IF NOT EXISTS year INT;`;
-  await sql`ALTER TABLE cases ADD COLUMN IF NOT EXISTS text_tried BOOLEAN DEFAULT FALSE;`;
+    );`, 'create cases');
 
-  await sql`
+  await step(() => sql`ALTER TABLE cases ADD COLUMN IF NOT EXISTS full_text TEXT DEFAULT '';`, 'full_text');
+  await step(() => sql`ALTER TABLE cases ADD COLUMN IF NOT EXISTS court TEXT DEFAULT 'HC';`, 'court');
+  await step(() => sql`ALTER TABLE cases ADD COLUMN IF NOT EXISTS case_type TEXT DEFAULT '';`, 'case_type');
+  await step(() => sql`ALTER TABLE cases ADD COLUMN IF NOT EXISTS year INT;`, 'year');
+  await step(() => sql`ALTER TABLE cases ADD COLUMN IF NOT EXISTS text_tried BOOLEAN DEFAULT FALSE;`, 'text_tried');
+
+  await step(() => sql`
     CREATE TABLE IF NOT EXISTS judges (
       id         SERIAL PRIMARY KEY,
       name_en    TEXT UNIQUE NOT NULL,
       name_dv    TEXT DEFAULT '',
       active     BOOLEAN DEFAULT TRUE,
       updated_at TIMESTAMPTZ DEFAULT NOW()
-    );
-  `;
+    );`, 'create judges');
 
-  // Trigram index for fast ILIKE search on full_text (best-effort).
-  try {
+  await step(async () => {
     await sql`CREATE EXTENSION IF NOT EXISTS pg_trgm;`;
     await sql`CREATE INDEX IF NOT EXISTS idx_cases_fulltext_trgm ON cases USING gin (full_text gin_trgm_ops);`;
-  } catch (e) { /* extension may be restricted; ILIKE still works, just slower */ }
-  await sql`CREATE INDEX IF NOT EXISTS idx_cases_year ON cases (year);`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_cases_type ON cases (case_type);`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_cases_presiding ON cases (presiding_en);`;
+  }, 'trgm index');
+  await step(() => sql`CREATE INDEX IF NOT EXISTS idx_cases_year ON cases (year);`, 'idx year');
+  await step(() => sql`CREATE INDEX IF NOT EXISTS idx_cases_type ON cases (case_type);`, 'idx type');
+  await step(() => sql`CREATE INDEX IF NOT EXISTS idx_cases_presiding ON cases (presiding_en);`, 'idx presiding');
 
-  // Seed cases once.
-  const { rows: c } = await sql`SELECT COUNT(*)::int AS n FROM cases;`;
-  if (c[0].n === 0) {
-    for (const x of seed) {
-      const { year, case_type } = deriveMeta(x.caseno, x.date_concluded, x.pdf_url);
-      await sql`
-        INSERT INTO cases (caseno,date_concluded,presiding_en,presiding_dv,bench,disposition,source,pdf_url,locked,court,case_type,year)
-        VALUES (${x.caseno},${x.date_concluded||''},${x.presiding_en||''},${x.presiding_dv||''},${x.bench||''},${x.disposition||''},${x.source||'text'},${x.pdf_url||''},${x.locked!==false},'HC',${case_type},${year})
-        ON CONFLICT (caseno) DO NOTHING;
-      `;
+  // Seed cases once (only if the table is empty and a seed is bundled).
+  await step(async () => {
+    const { rows: c } = await sql`SELECT COUNT(*)::int AS n FROM cases;`;
+    if (c[0].n === 0 && seed.length) {
+      for (const x of seed) {
+        const { year, case_type } = deriveMeta(x.caseno, x.date_concluded, x.pdf_url);
+        await sql`
+          INSERT INTO cases (caseno,date_concluded,presiding_en,presiding_dv,bench,disposition,source,pdf_url,locked,court,case_type,year)
+          VALUES (${x.caseno},${x.date_concluded||''},${x.presiding_en||''},${x.presiding_dv||''},${x.bench||''},${x.disposition||''},${x.source||'text'},${x.pdf_url||''},${x.locked!==false},'HC',${case_type},${year})
+          ON CONFLICT (caseno) DO NOTHING;`;
+      }
+    } else {
+      const { rows: need } = await sql`SELECT id, caseno, date_concluded, pdf_url FROM cases WHERE year IS NULL LIMIT 500;`;
+      for (const r of need) {
+        const { year, case_type } = deriveMeta(r.caseno, r.date_concluded, r.pdf_url);
+        await sql`UPDATE cases SET year=${year}, case_type=${case_type} WHERE id=${r.id};`;
+      }
     }
-  } else {
-    // Backfill year/case_type for pre-existing rows that predate these columns.
-    const { rows: need } = await sql`SELECT id, caseno, date_concluded, pdf_url FROM cases WHERE year IS NULL LIMIT 500;`;
-    for (const r of need) {
-      const { year, case_type } = deriveMeta(r.caseno, r.date_concluded, r.pdf_url);
-      await sql`UPDATE cases SET year=${year}, case_type=${case_type} WHERE id=${r.id};`;
-    }
-  }
+  }, 'seed/backfill cases');
 
-  // Seed judges once.
-  const { rows: j } = await sql`SELECT COUNT(*)::int AS n FROM judges;`;
-  if (j[0].n === 0) {
-    for (const [en, dv] of JUDGE_SEED) {
-      await sql`INSERT INTO judges (name_en,name_dv) VALUES (${en},${dv}) ON CONFLICT (name_en) DO NOTHING;`;
+  await step(async () => {
+    const { rows: j } = await sql`SELECT COUNT(*)::int AS n FROM judges;`;
+    if (j[0].n === 0) {
+      for (const [en, dv] of JUDGE_SEED) {
+        await sql`INSERT INTO judges (name_en,name_dv) VALUES (${en},${dv}) ON CONFLICT (name_en) DO NOTHING;`;
+      }
     }
-  }
+  }, 'seed judges');
 
   ready = true;
 }

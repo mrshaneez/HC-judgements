@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Admin — Maldives Judgments</title>
+<style>
+:root{
+  --bg:#f6f7f9;--card:#fff;--ink:#1a2733;--muted:#5c6b7a;--accent:#1F3B57;--line:#e3e8ee;
+  --hi:#2f6fb0;--danger:#c0392b;--ok:#2f6b2f;--warn:#9a6b00;
+  /* validated dataviz categorical slots (light) */
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;
+  --axis:#c3c2b7;--grid:#e1e0d9;--mutedink:#898781;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
+.wrap{max-width:1300px;margin:0 auto;padding:22px 16px 80px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:1.35rem;margin:0}
+h2{font-size:1.05rem;margin:0 0 10px}
+h3{margin:0 0 14px}
+a{color:var(--hi)}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:#fff;padding:8px 14px;color:var(--ink)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button.danger{color:var(--danger);border-color:#e8c9c4}
+button.sm{padding:4px 9px;font-size:.8rem}
+button[disabled]{opacity:.45;cursor:default}
+.tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.tab{padding:8px 15px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font-size:.92rem}
+.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;width:100%;color:var(--ink)}
+input[type=search]{max-width:280px}
+input[type=checkbox]{width:auto}
+.login{max-width:360px;margin:12vh auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:.86rem}
+th,td{padding:8px 9px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--accent);color:#fff;font-size:.78rem;white-space:nowrap}
+tr:hover td{background:#f0f5fa}
+.thaana{font-family:"MV Faseyha","MV Boli",Arial;direction:rtl;unicode-bidi:isolate}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.pager{display:flex;gap:10px;align-items:center;justify-content:center;margin:14px 0}
+.actions{white-space:nowrap}
+.actions button{margin-right:4px}
+.msg{padding:9px 12px;border-radius:8px;margin:10px 0;font-size:.9rem;display:none}
+.msg.err{background:#fce4e4;color:var(--danger);display:block}
+.msg.ok{background:#e6f0e6;color:var(--ok);display:block}
+.msg.info{background:#e7eff7;color:#244b6b;display:block}
+.overlay{position:fixed;inset:0;background:rgba(20,30,40,.45);display:none;align-items:flex-start;justify-content:center;padding:22px;overflow:auto;z-index:20}
+.overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;max-width:760px;width:100%;padding:22px;margin-top:3vh}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid .full{grid-column:1/3}
+label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:10px}
+.chk{display:flex;align-items:center;gap:8px}
+.hint{font-size:.78rem;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.tile .n{font-size:1.9rem;font-weight:700;line-height:1.1}
+.tile .l{font-size:.8rem;color:var(--muted);margin-top:4px}
+.tile.warn .n{color:var(--warn)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:820px){.row2{grid-template-columns:1fr}}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.82rem;margin:8px 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.swatch{width:12px;height:12px;border-radius:3px;display:inline-block}
+.jpick{display:flex;flex-wrap:wrap;gap:6px}
+.jpick label{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 10px;margin:0}
+.tcount{font-size:.78rem;color:var(--muted)}
+.scanbox{max-height:380px;overflow:auto;white-space:pre-wrap;border:1px solid var(--line);border-radius:8px;padding:12px;background:#fbfcfd;font-size:.85rem}
+@media (max-width:640px){.grid{grid-template-columns:1fr}.grid .full{grid-column:1}.hidem{display:none}}
+</style>
+</head>
+<body>
+
+<div id="loginView" class="login" style="display:none">
+  <h2>Admin sign in</h2>
+  <div id="loginMsg" class="msg"></div>
+  <form id="loginForm"><label>Password</label><input type="password" id="pw" required />
+  <div style="height:12px"></div><button class="primary" style="width:100%" type="submit">Sign in</button></form>
+</div>
+
+<div id="adminView" class="wrap" style="display:none">
+  <div class="topbar">
+    <h1>Admin — Maldives Judgments</h1>
+    <div style="display:flex;gap:10px;align-items:center">
+      <a href="/">← Public site</a><button id="logout">Log out</button>
+    </div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-tab="dash">Dashboard</div>
+    <div class="tab" data-tab="fetch">Fetch &amp; sync</div>
+    <div class="tab" data-tab="cases">Cases</div>
+    <div class="tab" data-tab="review">Needs review</div>
+    <div class="tab" data-tab="judges">Judges</div>
+    <div class="tab" data-tab="analytics">Analytics</div>
+  </div>
+  <div id="msg" class="msg"></div>
+
+  <!-- DASHBOARD -->
+  <div id="tab-dash">
+    <div class="tiles" id="tiles"></div>
+    <div class="row2" style="margin-top:16px">
+      <div class="card"><h2>Judgments by year</h2><div id="chYear"></div></div>
+      <div class="card"><h2>Judgments by type</h2><div id="chType"></div></div>
+    </div>
+  </div>
+
+  <!-- FETCH -->
+  <div id="tab-fetch" style="display:none">
+    <div class="card">
+      <h2>Fetch new judgments</h2>
+      <p class="hint">Pull judgments straight from the High&nbsp;Court website. New ones are added (flagged <em>Needs review</em> until they have a presiding judge); existing ones are left untouched.</p>
+      <div class="bar">
+        <button class="primary" id="syncBtn">Sync recent now</button>
+        <span>newest <input id="syncLimit" type="number" value="80" min="1" max="400" style="width:90px"/> judgments</span>
+        <span class="hint">Runs in the app, no setup. Good for catching the latest additions.</span>
+      </div>
+      <div class="bar">
+        <button id="runEnum">Run full fetch (all years)</button>
+        <button id="runText">Run text backfill</button>
+        <button id="reqMissing">Re-queue all missing text</button>
+      </div>
+      <p class="hint">The full fetch and text backfill run on GitHub (handles the whole ~2,000-judgment library and PDF text extraction). A daily job also fetches new judgments automatically.</p>
+      <div id="fetchMsg" class="msg"></div>
+    </div>
+    <div class="card">
+      <h2>Automatic schedule</h2>
+      <p class="hint">A scheduled job fetches new judgments every day, and a weekly job extracts their text. You can change the time/frequency in the repository's workflow file, or ask Claude to adjust it.</p>
+    </div>
+  </div>
+
+  <!-- CASES -->
+  <div id="tab-cases" style="display:none">
+    <div class="bar">
+      <button class="primary" id="addCase">+ Add case</button>
+      <input type="search" id="cq" placeholder="Search case no, name, text…" />
+      <select id="fYear" style="width:auto"><option value="">All years</option></select>
+      <select id="fType" style="width:auto"><option value="">All types</option></select>
+      <select id="fJudge" style="width:auto"><option value="">All judges</option></select>
+      <select id="fSource" style="width:auto"><option value="">All sources</option>
+        <option value="text">Judgment text</option><option value="manual">Manual</option>
+        <option value="needs-review">Needs review</option><option value="OCR-high">OCR · high</option>
+        <option value="OCR-med">OCR · med</option><option value="unresolved">Unresolved</option></select>
+      <a id="exportLink" href="/api/export" class="hint">⬇ Export CSV</a>
+      <a id="exportTextLink" href="/api/export?text=1" class="hint">⬇ CSV + full text</a>
+      <span id="cCount" class="hint"></span>
+    </div>
+    <div class="bar" id="bulkBar" style="display:none">
+      <span class="hint"><b id="selCount">0</b> selected:</span>
+      <button class="sm" data-bulk="lock">Lock</button>
+      <button class="sm" data-bulk="unlock">Unlock</button>
+      <button class="sm danger" data-bulk="delete">Delete</button>
+    </div>
+    <div id="caseTable"></div>
+    <div class="pager" id="casePager"></div>
+  </div>
+
+  <!-- NEEDS REVIEW -->
+  <div id="tab-review" style="display:none">
+    <p class="hint">Auto-added judgments with no presiding judge yet. Pick a judge to assign it (saved immediately).</p>
+    <div id="reviewTable"></div>
+    <div class="pager" id="reviewPager"></div>
+  </div>
+
+  <!-- JUDGES -->
+  <div id="tab-judges" style="display:none">
+    <div class="bar"><button class="primary" id="addJudge">+ Add judge</button>
+      <span class="hint">Renaming a judge can update every case at once.</span></div>
+    <div id="judgeTable"></div>
+  </div>
+
+  <!-- ANALYTICS -->
+  <div id="tab-analytics" style="display:none">
+    <div class="card">
+      <div class="bar">
+        <h2 style="margin:0">Cases per judge</h2>
+        <select id="metric" style="width:auto">
+          <option value="presided">Concluded (presiding)</option>
+          <option value="bench">Sat on bench</option>
+        </select>
+      </div>
+      <div id="chJudges"></div>
+    </div>
+    <div class="card">
+      <h2>Compare judges over time</h2>
+      <p class="hint">Pick judges to compare how many cases each concluded per year.</p>
+      <div class="jpick" id="jpick"></div>
+      <div class="legend" id="cmpLegend"></div>
+      <div id="chCompare"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Case modal -->
+<div class="overlay" id="cOverlay"><div class="modal">
+  <h3 id="cTitle">Edit case</h3>
+  <div class="grid">
+    <div><label>Case number *</label><input id="c_caseno" /></div>
+    <div><label>Date concluded (YYYY-MM-DD)</label><input id="c_date" placeholder="2026-01-31" /></div>
+    <div><label>Presiding judge</label><select id="c_pjudge"></select></div>
+    <div><label>Presiding (Dhivehi)</label><input id="c_pdv" class="thaana" /></div>
+    <div class="full"><label>Full bench</label><input id="c_bench" placeholder="Judge A; Judge B; Judge C" /></div>
+    <div class="full"><label>Disposition / subject</label><textarea id="c_disp" rows="2"></textarea></div>
+    <div><label>Source</label><select id="c_source">
+      <option value="manual">Manual</option><option value="text">Judgment text</option>
+      <option value="OCR-high">OCR · high</option><option value="OCR-med">OCR · med</option>
+      <option value="needs-review">Needs review</option><option value="unresolved">Unresolved</option></select></div>
+    <div><label>Original PDF URL</label><input id="c_pdf" /></div>
+    <div class="full">
+      <label>Extracted / full text (searchable &amp; copyable) <span id="c_textcount" class="tcount"></span></label>
+      <textarea id="c_text" rows="10" class="thaana"></textarea>
+    </div>
+    <div class="full chk"><input type="checkbox" id="c_locked" /><label style="margin:0">Locked — protect from the daily auto-update</label></div>
+  </div>
+  <div class="foot">
+    <div style="display:flex;gap:10px">
+      <button class="danger" id="cDelete" style="visibility:hidden">Delete</button>
+      <button id="cReextract" style="visibility:hidden">Re-extract text</button>
+      <a id="cPdf" href="#" target="_blank" rel="noopener" style="display:none;align-self:center">Open PDF ↗</a>
+    </div>
+    <div style="display:flex;gap:10px"><button id="cCancel">Cancel</button><button class="primary" id="cSave">Save</button></div>
+  </div>
+</div></div>
+
+<!-- Judge modal -->
+<div class="overlay" id="jOverlay"><div class="modal">
+  <h3 id="jTitle">Edit judge</h3>
+  <div class="grid">
+    <div><label>Name (English) *</label><input id="j_en" /></div>
+    <div><label>Name (Dhivehi)</label><input id="j_dv" class="thaana" /></div>
+    <div class="full chk"><input type="checkbox" id="j_active" checked /><label style="margin:0">Active (show in filters/dropdowns)</label></div>
+    <div class="full chk"><input type="checkbox" id="j_apply" /><label style="margin:0">Also rename this judge across all existing cases</label></div>
+  </div>
+  <div class="foot">
+    <button class="danger" id="jDelete" style="visibility:hidden">Delete</button>
+    <div style="display:flex;gap:10px"><button id="jCancel">Cancel</button><button class="primary" id="jSave">Save</button></div>
+  </div>
+</div></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function esc(s){return (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function flash(el,t,ok){el.className='msg '+(ok===true?'ok':ok==='info'?'info':'err');el.textContent=t;if(ok!=='info')setTimeout(()=>{el.className='msg';},5000);}
+const SERIES=['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300'];
+let JUDGES=[], META={years:[],types:[],judges:[]}, editingCase=null, editingJudge=null;
+let cstate={q:'',year:'',type:'',judge:'',source:'',page:1,pageSize:50,total:0};
+let rstate={page:1,pageSize:50,total:0};
+let selected=new Set();
+
+async function boot(){
+  const s=await (await fetch('/api/session')).json();
+  if(s.authed){$('adminView').style.display='';$('loginView').style.display='none';
+    await loadMeta();await loadJudges();await loadDash();}
+  else{$('loginView').style.display='';$('adminView').style.display='none';}
+}
+$('loginForm').onsubmit=async e=>{e.preventDefault();
+  const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:$('pw').value})});
+  if(r.ok)boot();else flash($('loginMsg'),'Incorrect password',false);};
+$('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST'});boot();};
+
+const TABS={dash:loadDash,fetch:null,cases:loadCases,review:loadReview,judges:loadJudges,analytics:loadAnalytics};
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');
+  ['dash','fetch','cases','review','judges','analytics'].forEach(n=>$('tab-'+n).style.display=n===t.dataset.tab?'':'none');
+  const fn=TABS[t.dataset.tab];if(fn)fn();
+});
+
+/* ---------- meta (filters) ---------- */
+async function loadMeta(){
+  META=await (await fetch('/api/meta')).json();
+  const yo='<option value="">All years</option>'+(META.years||[]).map(y=>`<option value="${y}">${y}</option>`).join('');
+  const to='<option value="">All types</option>'+(META.types||[]).map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  const jo='<option value="">All judges</option>'+(META.judges||[]).map(j=>`<option value="${esc(j.name_en)}">${esc(j.name_en)}${j.count!=null?' ('+j.count+')':''}</option>`).join('');
+  $('fYear').innerHTML=yo;$('fType').innerHTML=to;$('fJudge').innerHTML=jo;
+}
+
+/* ---------- Dashboard ---------- */
+async function loadDash(){
+  const s=await (await fetch('/api/admin?action=stats')).json();window.__stats=s;
+  const t=s.totals||{};
+  const tiles=[['Total judgments',t.total,''],['With text',t.withText,''],['Needs review',t.needsReview,'warn'],
+    ['Text pending',t.pending,''],['Scanned (no text)',t.scanned,''],['Locked',t.locked,'']];
+  $('tiles').innerHTML=tiles.map(([l,n,c])=>`<div class="tile ${c}"><div class="n">${n==null?'—':n}</div><div class="l">${l}</div></div>`).join('');
+  $('chYear').innerHTML=hbars((s.years||[]).map(r=>({label:r.year,value:r.n})),'var(--s1)');
+  $('chType').innerHTML=hbars((s.types||[]).map(r=>({label:r.case_type,value:r.n})),'var(--s1)');
+}
+
+/* ---------- horizontal bar chart (single series, direct value labels) ---------- */
+function hbars(data,color){
+  if(!data.length)return '<p class="hint">No data yet.</p>';
+  const max=Math.max(1,...data.map(d=>d.value));
+  const W=520,rowH=26,lblW=70,valW=44,plot=W-lblW-valW;
+  const H=data.length*rowH+8;
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px" role="img">`;
+  data.forEach((d,i)=>{
+    const y=i*rowH+4,bw=Math.max(2,plot*d.value/max);
+    svg+=`<text x="${lblW-8}" y="${y+rowH/2}" text-anchor="end" dominant-baseline="middle" font-size="12" fill="var(--ink)">${esc(d.label)}</text>`;
+    svg+=`<rect x="${lblW}" y="${y+4}" width="${bw}" height="${rowH-12}" rx="4" fill="${color}"><title>${esc(d.label)}: ${d.value}</title></rect>`;
+    svg+=`<text x="${lblW+bw+6}" y="${y+rowH/2}" dominant-baseline="middle" font-size="12" font-weight="600" fill="var(--ink)">${d.value}</text>`;
+  });
+  svg+=`</svg>`;return svg;
+}
+
+/* ---------- Cases ---------- */
+function cqs(st){const p=new URLSearchParams();p.set('page',st.page);p.set('pageSize',st.pageSize);
+  if(st.q)p.set('q',st.q);if(st.year)p.set('year',st.year);if(st.type)p.set('type',st.type);
+  if(st.judge)p.set('judge',st.judge);if(st.source)p.set('source',st.source);return p.toString();}
+
+async function loadCases(){
+  const r=await (await fetch('/api/cases?'+cqs(cstate))).json();cstate.total=r.total||0;
+  const rows=r.cases||[];
+  const head=`<table><thead><tr><th style="width:28px"><input type="checkbox" id="selAll"/></th><th>Case No</th><th>Date</th><th class="hidem">Type</th><th>Presiding</th><th class="hidem">Src</th><th>Text</th><th>Lock</th><th></th></tr></thead><tbody>`;
+  $('caseTable').innerHTML=head+rows.map(x=>`<tr>
+    <td><input type="checkbox" class="rsel" data-id="${x.id}" ${selected.has(String(x.id))?'checked':''}/></td>
+    <td>${esc(x.caseno)}</td><td>${esc(x.date_concluded)}</td><td class="hidem">${esc(x.case_type||'')}</td>
+    <td>${esc(x.presiding_en)||'<span class="hint">—</span>'}</td><td class="hidem">${esc(x.source||'')}</td>
+    <td>${x.has_text?'✓':'—'}</td><td>${x.locked?'🔒':'—'}</td>
+    <td class="actions"><button class="sm" data-edit="${x.id}">Edit</button></td></tr>`).join('')+'</tbody></table>';
+  $('cCount').textContent=`${cstate.total} cases`;
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=async()=>{
+    const j=await (await fetch('/api/cases?id='+b.dataset.edit)).json();openCase(j.case);});
+  document.querySelectorAll('.rsel').forEach(cb=>cb.onchange=()=>{cb.checked?selected.add(cb.dataset.id):selected.delete(cb.dataset.id);updateBulk();});
+  if($('selAll'))$('selAll').onchange=e=>{document.querySelectorAll('.rsel').forEach(cb=>{cb.checked=e.target.checked;cb.checked?selected.add(cb.dataset.id):selected.delete(cb.dataset.id);});updateBulk();};
+  pager('casePager',cstate,loadCases);
+  updateBulk();
+}
+function updateBulk(){$('bulkBar').style.display=selected.size?'':'none';$('selCount').textContent=selected.size;}
+function pager(elId,st,fn){
+  const pages=Math.max(1,Math.ceil(st.total/st.pageSize));
+  $(elId).innerHTML=`<button ${st.page<=1?'disabled':''} data-pp>‹ Prev</button><span class="hint">Page ${st.page} of ${pages}</span><button ${st.page>=pages?'disabled':''} data-pn>Next ›</button>`;
+  const pp=$(elId).querySelector('[data-pp]'),pn=$(elId).querySelector('[data-pn]');
+  if(pp)pp.onclick=()=>{if(st.page>1){st.page--;fn();}};
+  if(pn)pn.onclick=()=>{const p=Math.ceil(st.total/st.pageSize);if(st.page<p){st.page++;fn();}};
+}
+let ct;$('cq').oninput=()=>{clearTimeout(ct);ct=setTimeout(()=>{cstate.q=$('cq').value.trim();cstate.page=1;loadCases();},300);};
+['fYear','fType','fJudge','fSource'].forEach(id=>$(id).onchange=()=>{
+  cstate.year=$('fYear').value;cstate.type=$('fType').value;cstate.judge=$('fJudge').value;cstate.source=$('fSource').value;
+  cstate.page=1;loadCases();});
+document.querySelectorAll('[data-bulk]').forEach(b=>b.onclick=async()=>{
+  const ids=[...selected];if(!ids.length)return;const act=b.dataset.bulk;
+  if(act==='delete'&&!confirm('Delete '+ids.length+' case(s)?'))return;
+  for(const id of ids){
+    if(act==='delete')await fetch('/api/cases',{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({id})});
+    else await fetch('/api/cases',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({id,locked:act==='lock'})});
+  }
+  selected.clear();flash($('msg'),'Done.',true);loadCases();
+});
+
+function fillJudgeSelect(sel,val){
+  sel.innerHTML='<option value="">— none —</option>'+JUDGES.map(j=>`<option value="${esc(j.name_en)}">${esc(j.name_en)}</option>`).join('')+'<option value="__other">(other / free text)</option>';
+  if(val&&!JUDGES.some(j=>j.name_en===val)){const o=document.createElement('option');o.value=val;o.textContent=val;sel.appendChild(o);}
+  sel.value=val||'';
+}
+function openCase(row){
+  editingCase=row||null;
+  $('cTitle').textContent=row?('Edit case — '+esc(row.caseno)):'Add case';
+  $('c_caseno').value=row?row.caseno:'';$('c_date').value=row?row.date_concluded:'';
+  fillJudgeSelect($('c_pjudge'),row?row.presiding_en:'');
+  $('c_pdv').value=row?row.presiding_dv:'';$('c_bench').value=row?row.bench:'';
+  $('c_disp').value=row?row.disposition:'';$('c_source').value=row?row.source:'manual';
+  $('c_pdf').value=row?row.pdf_url:'';
+  const txt=row?(row.full_text||''):'';$('c_text').value=txt;updTextCount();
+  $('c_locked').checked=row?!!row.locked:true;
+  $('cDelete').style.visibility=row?'visible':'hidden';
+  $('cReextract').style.visibility=(row&&row.pdf_url)?'visible':'hidden';
+  if(row&&row.pdf_url){$('cPdf').style.display='';$('cPdf').href=row.pdf_url;}else $('cPdf').style.display='none';
+  $('cOverlay').classList.add('open');
+}
+function updTextCount(){const n=($('c_text').value||'').length;$('c_textcount').textContent=n?('· '+n.toLocaleString()+' chars'):'· empty';}
+$('c_text').oninput=updTextCount;
+$('c_pjudge').onchange=()=>{const v=$('c_pjudge').value;if(v==='__other'){$('c_pjudge').value='';return;}const j=JUDGES.find(x=>x.name_en===v);if(j&&!$('c_pdv').value)$('c_pdv').value=j.name_dv||'';};
+$('addCase').onclick=()=>openCase(null);
+$('cCancel').onclick=()=>$('cOverlay').classList.remove('open');
+$('cOverlay').onclick=e=>{if(e.target===$('cOverlay'))$('cOverlay').classList.remove('open');};
+$('cSave').onclick=async()=>{
+  const p={caseno:$('c_caseno').value.trim(),date_concluded:$('c_date').value.trim(),
+    presiding_en:($('c_pjudge').value==='__other'?'':$('c_pjudge').value),presiding_dv:$('c_pdv').value.trim(),
+    bench:$('c_bench').value.trim(),disposition:$('c_disp').value.trim(),source:$('c_source').value,
+    pdf_url:$('c_pdf').value.trim(),full_text:$('c_text').value,locked:$('c_locked').checked};
+  if(!p.caseno){flash($('msg'),'Case number required',false);return;}
+  let r;if(editingCase){p.id=editingCase.id;r=await fetch('/api/cases',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(p)});}
+  else r=await fetch('/api/cases',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(p)});
+  if(r.ok){$('cOverlay').classList.remove('open');loadCases();flash($('msg'),'Saved.',true);}
+  else{const j=await r.json().catch(()=>({}));flash($('msg'),j.error||'Save failed',false);}
+};
+$('cDelete').onclick=async()=>{if(!editingCase)return;if(!confirm('Delete '+editingCase.caseno+'?'))return;
+  const r=await fetch('/api/cases',{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({id:editingCase.id})});
+  if(r.ok){$('cOverlay').classList.remove('open');loadCases();flash($('msg'),'Deleted.',true);}};
+$('cReextract').onclick=async()=>{if(!editingCase)return;
+  const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'reextract',id:editingCase.id})});
+  if(r.ok)flash($('msg'),'Queued for text re-extraction — it will be re-pulled on the next text backfill run.',true);
+  else flash($('msg'),'Could not queue re-extraction.',false);};
+
+/* ---------- Needs review ---------- */
+async function loadReview(){
+  const r=await (await fetch('/api/cases?source=needs-review&pageSize='+rstate.pageSize+'&page='+rstate.page)).json();
+  rstate.total=r.total||0;const rows=r.cases||[];
+  const head=`<table><thead><tr><th>Case No</th><th>Date</th><th>Type</th><th>Assign presiding judge</th><th></th></tr></thead><tbody>`;
+  $('reviewTable').innerHTML=head+(rows.length?rows.map(x=>`<tr>
+    <td>${esc(x.caseno)}</td><td>${esc(x.date_concluded)}</td><td>${esc(x.case_type||'')}</td>
+    <td><select class="rev" data-id="${x.id}"><option value="">— pick —</option>${JUDGES.map(j=>`<option value="${esc(j.name_en)}">${esc(j.name_en)}</option>`).join('')}</select></td>
+    <td class="actions"><button class="sm" data-edit2="${x.id}">Open</button></td></tr>`).join('')
+    :'<tr><td colspan="5" class="hint" style="padding:16px">Nothing needs review 🎉</td></tr>')+'</tbody></table>';
+  document.querySelectorAll('.rev').forEach(sel=>sel.onchange=async()=>{
+    if(!sel.value)return;const j=JUDGES.find(x=>x.name_en===sel.value);
+    const r=await fetch('/api/cases',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({id:sel.dataset.id,presiding_en:sel.value,presiding_dv:(j&&j.name_dv)||'',source:'manual'})});
+    if(r.ok){flash($('msg'),'Assigned '+sel.value+'.',true);loadReview();}else flash($('msg'),'Save failed',false);});
+  document.querySelectorAll('[data-edit2]').forEach(b=>b.onclick=async()=>{const j=await (await fetch('/api/cases?id='+b.dataset.edit2)).json();openCase(j.case);});
+  pager('reviewPager',rstate,loadReview);
+}
+
+/* ---------- Judges ---------- */
+async function loadJudges(){
+  const j=await (await fetch('/api/judges')).json();JUDGES=j.judges||[];
+  const head=`<table><thead><tr><th>Name (English)</th><th>ދިވެހި</th><th>Active</th><th></th></tr></thead><tbody>`;
+  $('judgeTable').innerHTML=head+JUDGES.map(x=>`<tr><td>${esc(x.name_en)}</td><td class="thaana">${esc(x.name_dv)}</td><td>${x.active?'✓':'—'}</td>
+    <td class="actions"><button class="sm" data-jedit="${x.id}">Edit</button></td></tr>`).join('')+'</tbody></table>';
+  document.querySelectorAll('[data-jedit]').forEach(b=>b.onclick=()=>openJudge(JUDGES.find(z=>z.id==b.dataset.jedit)));
+}
+function openJudge(row){editingJudge=row||null;$('jTitle').textContent=row?'Edit judge':'Add judge';
+  $('j_en').value=row?row.name_en:'';$('j_dv').value=row?row.name_dv:'';$('j_active').checked=row?!!row.active:true;$('j_apply').checked=false;
+  $('jDelete').style.visibility=row?'visible':'hidden';$('jOverlay').classList.add('open');}
+$('addJudge').onclick=()=>openJudge(null);
+$('jCancel').onclick=()=>$('jOverlay').classList.remove('open');
+$('jOverlay').onclick=e=>{if(e.target===$('jOverlay'))$('jOverlay').classList.remove('open');};
+$('jSave').onclick=async()=>{
+  const p={name_en:$('j_en').value.trim(),name_dv:$('j_dv').value.trim(),active:$('j_active').checked,applyToCases:$('j_apply').checked};
+  if(!p.name_en){flash($('msg'),'English name required',false);return;}
+  let r;if(editingJudge){p.id=editingJudge.id;r=await fetch('/api/judges',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(p)});}
+  else r=await fetch('/api/judges',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(p)});
+  if(r.ok){const j=await r.json().catch(()=>({}));$('jOverlay').classList.remove('open');await loadJudges();await loadMeta();
+    flash($('msg'),'Saved.'+(j.propagated?(' Updated '+j.propagated+' case fields.'):''),true);}
+  else{const j=await r.json().catch(()=>({}));flash($('msg'),j.error||'Save failed',false);}
+};
+$('jDelete').onclick=async()=>{if(!editingJudge)return;if(!confirm('Delete judge '+editingJudge.name_en+'? (Cases keep their text.)'))return;
+  const r=await fetch('/api/judges',{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({id:editingJudge.id})});
+  if(r.ok){$('jOverlay').classList.remove('open');loadJudges();flash($('msg'),'Deleted.',true);}};
+
+/* ---------- Fetch & sync ---------- */
+$('syncBtn').onclick=async()=>{
+  const b=$('syncBtn');b.disabled=true;flash($('fetchMsg'),'Fetching from the High Court website… this can take up to a minute.','info');
+  try{
+    const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'sync',limit:parseInt($('syncLimit').value,10)||80})});
+    const j=await r.json();
+    if(r.ok)flash($('fetchMsg'),`Done — ${j.added} added, ${j.updated} updated, ${j.skipped} unchanged (from ${j.feedTotal} on the court site).`,true);
+    else flash($('fetchMsg'),j.error||'Sync failed',false);
+  }catch(e){flash($('fetchMsg'),String(e),false);}
+  b.disabled=false;loadMeta();
+};
+async function triggerRun(mode,label){
+  flash($('fetchMsg'),'Requesting '+label+'…','info');
+  const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'run',mode})});
+  const j=await r.json();
+  if(j.ok)flash($('fetchMsg'),j.message||'Started.',true);
+  else if(j.needsToken)flash($('fetchMsg'),'One-click run needs a GitHub token. For now, run it here: '+j.actionsUrl,'info'),window.open(j.actionsUrl,'_blank');
+  else flash($('fetchMsg'),(j.error||'Failed')+(j.actionsUrl?(' — run manually: '+j.actionsUrl):''),false);
+}
+$('runEnum').onclick=()=>triggerRun('enumerate','full fetch');
+$('runText').onclick=()=>triggerRun('text','text backfill');
+$('reqMissing').onclick=async()=>{
+  if(!confirm('Re-queue every judgment that has no text for re-extraction?'))return;
+  const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'reextract',allMissing:true})});
+  const j=await r.json();
+  if(r.ok)flash($('fetchMsg'),`Queued ${j.queued} judgments. Now run the text backfill to extract them.`,true);
+  else flash($('fetchMsg'),j.error||'Failed',false);
+};
+
+/* ---------- Analytics ---------- */
+let analyticsLoaded=false, cmpSel=new Set();
+async function loadAnalytics(){
+  const s=window.__stats||await (await fetch('/api/admin?action=stats')).json();window.__stats=s;
+  drawJudges();
+  if(!analyticsLoaded){
+    $('jpick').innerHTML=(s.judges||[]).map(j=>`<label><input type="checkbox" class="jp" value="${esc(j.name_en)}"/> ${esc(j.name_en)}</label>`).join('');
+    document.querySelectorAll('.jp').forEach(cb=>cb.onchange=()=>{cb.checked?cmpSel.add(cb.value):cmpSel.delete(cb.value);if(cmpSel.size>6){cb.checked=false;cmpSel.delete(cb.value);flash($('msg'),'Compare up to 6 judges at once.',false);return;}drawCompare();});
+    // preselect top 3 by presided
+    (s.judges||[]).slice().sort((a,b)=>b.presided-a.presided).slice(0,3).forEach(j=>cmpSel.add(j.name_en));
+    document.querySelectorAll('.jp').forEach(cb=>{if(cmpSel.has(cb.value))cb.checked=true;});
+    analyticsLoaded=true;
+  }
+  drawCompare();
+}
+$('metric').onchange=drawJudges;
+function drawJudges(){
+  const s=window.__stats||{};const m=$('metric').value;
+  const data=(s.judges||[]).map(j=>({label:j.name_en,value:m==='bench'?j.bench:j.presided})).sort((a,b)=>b.value-a.value);
+  $('chJudges').innerHTML=hbars(data,'var(--s1)');
+}
+function drawCompare(){
+  const s=window.__stats||{};const names=[...cmpSel];
+  if(!names.length){$('chCompare').innerHTML='<p class="hint">Pick one or more judges above.</p>';$('cmpLegend').innerHTML='';return;}
+  const years=[...new Set((s.presidedByYear||[]).map(r=>r.year))].sort();
+  if(!years.length){$('chCompare').innerHTML='<p class="hint">No year data yet.</p>';$('cmpLegend').innerHTML='';return;}
+  const map={};(s.presidedByYear||[]).forEach(r=>{map[r.presiding_en+'|'+r.year]=r.n;});
+  const colorOf={};names.forEach((n,i)=>colorOf[n]=SERIES[i%SERIES.length]);
+  $('cmpLegend').innerHTML=names.map(n=>`<span><i class="swatch" style="background:${colorOf[n]}"></i>${esc(n)}</span>`).join('');
+  const max=Math.max(1,...years.flatMap(y=>names.map(n=>map[n+'|'+y]||0)));
+  const W=640,H=300,padL=36,padB=28,padT=10,plotH=H-padB-padT,plotW=W-padL-10;
+  const gw=plotW/years.length, bw=Math.min(26,(gw-10)/names.length);
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px" role="img">`;
+  // gridlines
+  for(let g=0;g<=4;g++){const v=Math.round(max*g/4),y=padT+plotH-plotH*g/4;
+    svg+=`<line x1="${padL}" y1="${y}" x2="${W-10}" y2="${y}" stroke="var(--grid)"/><text x="${padL-6}" y="${y}" text-anchor="end" dominant-baseline="middle" font-size="10" fill="var(--mutedink)">${v}</text>`;}
+  years.forEach((yr,gi)=>{
+    const gx=padL+gi*gw;
+    svg+=`<text x="${gx+gw/2}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink)">${yr}</text>`;
+    names.forEach((n,si)=>{
+      const v=map[n+'|'+yr]||0,bh=plotH*v/max,x=gx+(gw-bw*names.length)/2+si*bw,y=padT+plotH-bh;
+      svg+=`<rect x="${x}" y="${y}" width="${Math.max(0,bw-2)}" height="${bh}" rx="3" fill="${colorOf[n]}"><title>${esc(n)} · ${yr}: ${v}</title></rect>`;
+    });
+  });
+  svg+=`<line x1="${padL}" y1="${padT+plotH}" x2="${W-10}" y2="${padT+plotH}" stroke="var(--axis)"/></svg>`;
+  $('chCompare').innerHTML=svg;
+}
+
+boot();
+</script>
+</body></html>

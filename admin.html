@@ -75,10 +75,15 @@ label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
 <body>
 
 <div id="loginView" class="login" style="display:none">
-  <h2>Admin sign in</h2>
+  <h2>Sign in</h2>
   <div id="loginMsg" class="msg"></div>
-  <form id="loginForm"><label>Password</label><input type="password" id="pw" required />
-  <div style="height:12px"></div><button class="primary" style="width:100%" type="submit">Sign in</button></form>
+  <form id="loginForm">
+    <label>Email <span class="hint">(leave blank for admin)</span></label>
+    <input type="email" id="le" autocomplete="username" />
+    <label style="margin-top:10px">Password</label>
+    <input type="password" id="pw" autocomplete="current-password" required />
+    <div style="height:12px"></div><button class="primary" style="width:100%" type="submit">Sign in</button>
+  </form>
 </div>
 
 <div id="adminView" class="wrap" style="display:none">
@@ -95,6 +100,7 @@ label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
     <div class="tab" data-tab="review">Needs review</div>
     <div class="tab" data-tab="judges">Judges</div>
     <div class="tab" data-tab="analytics">Analytics</div>
+    <div class="tab" data-tab="users">Users</div>
   </div>
   <div id="msg" class="msg"></div>
 
@@ -104,6 +110,23 @@ label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
     <div class="row2" style="margin-top:16px">
       <div class="card"><h2>Judgments by year</h2><div id="chYear"></div></div>
       <div class="card"><h2>Judgments by type</h2><div id="chType"></div></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="bar">
+        <h2 style="margin:0">Judge performance</h2>
+        <button class="sm pset" data-range="week">This week</button>
+        <button class="sm pset" data-range="month">This month</button>
+        <button class="sm pset" data-range="year">This year</button>
+        <button class="sm pset active" data-range="all">All time</button>
+        <span class="hint">custom:</span>
+        <input type="date" id="jfFrom" style="width:auto" />
+        <span>–</span>
+        <input type="date" id="jfTo" style="width:auto" />
+        <button class="sm" id="jfApply">Apply</button>
+        <span id="jfLabel" class="hint"></span>
+      </div>
+      <p class="hint" style="margin-top:0">Each card = cases a judge <b>concluded</b> (presided) in the selected period; the small number is cases they sat on the bench for.</p>
+      <div class="tiles" id="judgeCards"></div>
     </div>
   </div>
 
@@ -136,6 +159,7 @@ label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
     <div class="bar">
       <button class="primary" id="addCase">+ Add case</button>
       <input type="search" id="cq" placeholder="Search case no, name, text…" />
+      <input type="search" id="cParties" placeholder="Search parties…" />
       <select id="fYear" style="width:auto"><option value="">All years</option></select>
       <select id="fType" style="width:auto"><option value="">All types</option></select>
       <select id="fJudge" style="width:auto"><option value="">All judges</option></select>
@@ -191,6 +215,18 @@ label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
       <div id="chCompare"></div>
     </div>
   </div>
+
+  <!-- USERS -->
+  <div id="tab-users" style="display:none">
+    <div class="bar">
+      <input id="u_email" type="email" placeholder="user@example.com" style="max-width:240px" />
+      <input id="u_pass" type="text" placeholder="password" style="max-width:180px" />
+      <select id="u_role" style="width:auto"><option value="viewer">Viewer (search only)</option><option value="admin">Admin (full access)</option></select>
+      <button class="primary" id="addUser">+ Add / update user</button>
+    </div>
+    <p class="hint">Viewers can search and read judgments only. Admins get this whole control panel. The master admin password always works regardless of this list.</p>
+    <div id="userTable"></div>
+  </div>
 </div>
 
 <!-- Case modal -->
@@ -202,6 +238,7 @@ label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
     <div><label>Presiding judge</label><select id="c_pjudge"></select></div>
     <div><label>Presiding (Dhivehi)</label><input id="c_pdv" class="thaana" /></div>
     <div class="full"><label>Full bench</label><input id="c_bench" placeholder="Judge A; Judge B; Judge C" /></div>
+    <div class="full"><label>Parties (appellant v. respondent)</label><input id="c_parties" class="thaana" /></div>
     <div class="full"><label>Disposition / subject</label><textarea id="c_disp" rows="2"></textarea></div>
     <div><label>Source</label><select id="c_source">
       <option value="manual">Manual</option><option value="text">Judgment text</option>
@@ -245,25 +282,26 @@ function esc(s){return (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<'
 function flash(el,t,ok){el.className='msg '+(ok===true?'ok':ok==='info'?'info':'err');el.textContent=t;if(ok!=='info')setTimeout(()=>{el.className='msg';},5000);}
 const SERIES=['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300'];
 let JUDGES=[], META={years:[],types:[],judges:[]}, editingCase=null, editingJudge=null;
-let cstate={q:'',year:'',type:'',judge:'',source:'',page:1,pageSize:50,total:0};
+let cstate={q:'',year:'',type:'',judge:'',source:'',parties:'',page:1,pageSize:50,total:0};
 let rstate={page:1,pageSize:50,total:0};
 let selected=new Set();
 
 async function boot(){
-  const s=await (await fetch('/api/session')).json();
-  if(s.authed){$('adminView').style.display='';$('loginView').style.display='none';
+  let s={authed:false};try{s=await (await fetch('/api/session')).json();}catch(e){}
+  if(s.authed&&s.role==='admin'){$('adminView').style.display='';$('loginView').style.display='none';
     await loadMeta();await loadJudges();await loadDash();}
-  else{$('loginView').style.display='';$('adminView').style.display='none';}
+  else{$('loginView').style.display='';$('adminView').style.display='none';
+    if(s.authed)flash($('loginMsg'),'This area is for admins only — use the public search.',false);}
 }
 $('loginForm').onsubmit=async e=>{e.preventDefault();
-  const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:$('pw').value})});
-  if(r.ok)boot();else flash($('loginMsg'),'Incorrect password',false);};
+  const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('le').value.trim(),password:$('pw').value})});
+  if(r.ok)boot();else flash($('loginMsg'),'Incorrect email or password',false);};
 $('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST'});boot();};
 
-const TABS={dash:loadDash,fetch:null,cases:loadCases,review:loadReview,judges:loadJudges,analytics:loadAnalytics};
+const TABS={dash:loadDash,fetch:null,cases:loadCases,review:loadReview,judges:loadJudges,analytics:loadAnalytics,users:loadUsers};
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');
-  ['dash','fetch','cases','review','judges','analytics'].forEach(n=>$('tab-'+n).style.display=n===t.dataset.tab?'':'none');
+  ['dash','fetch','cases','review','judges','analytics','users'].forEach(n=>$('tab-'+n).style.display=n===t.dataset.tab?'':'none');
   const fn=TABS[t.dataset.tab];if(fn)fn();
 });
 
@@ -285,6 +323,48 @@ async function loadDash(){
   $('tiles').innerHTML=tiles.map(([l,n,c])=>`<div class="tile ${c}"><div class="n">${n==null?'—':n}</div><div class="l">${l}</div></div>`).join('');
   $('chYear').innerHTML=hbars((s.years||[]).map(r=>({label:r.year,value:r.n})),'var(--s1)');
   $('chType').innerHTML=hbars((s.types||[]).map(r=>({label:r.case_type,value:r.n})),'var(--s1)');
+  renderJudgeCards(s.judges,'All time');
+  setupJudgeFilter();
+}
+
+/* ---------- Judge performance cards (period-filterable) ---------- */
+function isoDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function presetRange(kind){
+  const now=new Date();const to=isoDate(now);
+  if(kind==='week'){const d=new Date(now);const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);return{from:isoDate(d),to};}
+  if(kind==='month')return{from:isoDate(new Date(now.getFullYear(),now.getMonth(),1)),to};
+  if(kind==='year')return{from:isoDate(new Date(now.getFullYear(),0,1)),to};
+  return{from:'',to:''};
+}
+function renderJudgeCards(judges,label){
+  $('jfLabel').textContent=label?('· '+label):'';
+  const data=(judges||[]).slice().sort((a,b)=>b.presided-a.presided);
+  $('judgeCards').innerHTML=data.length
+    ? data.map(j=>`<div class="tile"><div class="n">${j.presided}</div><div class="l">${esc(j.name_en)}</div><div class="hint">${j.bench} on bench</div></div>`).join('')
+    : '<p class="hint">No judge data for this period.</p>';
+}
+async function loadJudgeCards(from,to,label){
+  $('judgeCards').innerHTML='<p class="hint">Loading…</p>';
+  const qs=(from&&to)?('&from='+from+'&to='+to):'';
+  const s=await (await fetch('/api/admin?action=stats'+qs)).json();
+  renderJudgeCards(s.judges,label);
+}
+let judgeFilterWired=false;
+function setupJudgeFilter(){
+  if(judgeFilterWired)return;judgeFilterWired=true;
+  document.querySelectorAll('.pset').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.pset').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+    const kind=b.dataset.range;
+    if(kind==='all'){$('jfFrom').value='';$('jfTo').value='';loadJudgeCards('','','All time');return;}
+    const r=presetRange(kind);$('jfFrom').value=r.from;$('jfTo').value=r.to;
+    const nm={week:'This week',month:'This month',year:'This year'}[kind];
+    loadJudgeCards(r.from,r.to,nm+' ('+r.from+' → '+r.to+')');
+  });
+  $('jfApply').onclick=()=>{const f=$('jfFrom').value,t=$('jfTo').value;
+    if(!f||!t){flash($('msg'),'Pick both From and To dates.',false);return;}
+    if(f>t){flash($('msg'),'From date is after To date.',false);return;}
+    document.querySelectorAll('.pset').forEach(x=>x.classList.remove('active'));
+    loadJudgeCards(f,t,f+' → '+t);};
 }
 
 /* ---------- horizontal bar chart (single series, direct value labels) ---------- */
@@ -306,16 +386,16 @@ function hbars(data,color){
 /* ---------- Cases ---------- */
 function cqs(st){const p=new URLSearchParams();p.set('page',st.page);p.set('pageSize',st.pageSize);
   if(st.q)p.set('q',st.q);if(st.year)p.set('year',st.year);if(st.type)p.set('type',st.type);
-  if(st.judge)p.set('judge',st.judge);if(st.source)p.set('source',st.source);return p.toString();}
+  if(st.judge)p.set('judge',st.judge);if(st.source)p.set('source',st.source);if(st.parties)p.set('parties',st.parties);return p.toString();}
 
 async function loadCases(){
   const r=await (await fetch('/api/cases?'+cqs(cstate))).json();cstate.total=r.total||0;
   const rows=r.cases||[];
-  const head=`<table><thead><tr><th style="width:28px"><input type="checkbox" id="selAll"/></th><th>Case No</th><th>Date</th><th class="hidem">Type</th><th>Presiding</th><th class="hidem">Src</th><th>Text</th><th>Lock</th><th></th></tr></thead><tbody>`;
+  const head=`<table><thead><tr><th style="width:28px"><input type="checkbox" id="selAll"/></th><th>Case No</th><th>Date</th><th class="hidem">Type</th><th>Presiding</th><th class="hidem">Parties</th><th class="hidem">Src</th><th>Text</th><th>Lock</th><th></th></tr></thead><tbody>`;
   $('caseTable').innerHTML=head+rows.map(x=>`<tr>
     <td><input type="checkbox" class="rsel" data-id="${x.id}" ${selected.has(String(x.id))?'checked':''}/></td>
     <td>${esc(x.caseno)}</td><td>${esc(x.date_concluded)}</td><td class="hidem">${esc(x.case_type||'')}</td>
-    <td>${esc(x.presiding_en)||'<span class="hint">—</span>'}</td><td class="hidem">${esc(x.source||'')}</td>
+    <td>${esc(x.presiding_en)||'<span class="hint">—</span>'}</td><td class="hidem thaana">${esc(x.parties||'')}</td><td class="hidem">${esc(x.source||'')}</td>
     <td>${x.has_text?'✓':'—'}</td><td>${x.locked?'🔒':'—'}</td>
     <td class="actions"><button class="sm" data-edit="${x.id}">Edit</button></td></tr>`).join('')+'</tbody></table>';
   $('cCount').textContent=`${cstate.total} cases`;
@@ -335,6 +415,7 @@ function pager(elId,st,fn){
   if(pn)pn.onclick=()=>{const p=Math.ceil(st.total/st.pageSize);if(st.page<p){st.page++;fn();}};
 }
 let ct;$('cq').oninput=()=>{clearTimeout(ct);ct=setTimeout(()=>{cstate.q=$('cq').value.trim();cstate.page=1;loadCases();},300);};
+let ctp;$('cParties').oninput=()=>{clearTimeout(ctp);ctp=setTimeout(()=>{cstate.parties=$('cParties').value.trim();cstate.page=1;loadCases();},300);};
 ['fYear','fType','fJudge','fSource'].forEach(id=>$(id).onchange=()=>{
   cstate.year=$('fYear').value;cstate.type=$('fType').value;cstate.judge=$('fJudge').value;cstate.source=$('fSource').value;
   cstate.page=1;loadCases();});
@@ -359,6 +440,7 @@ function openCase(row){
   $('c_caseno').value=row?row.caseno:'';$('c_date').value=row?row.date_concluded:'';
   fillJudgeSelect($('c_pjudge'),row?row.presiding_en:'');
   $('c_pdv').value=row?row.presiding_dv:'';$('c_bench').value=row?row.bench:'';
+  $('c_parties').value=row?(row.parties||''):'';
   $('c_disp').value=row?row.disposition:'';$('c_source').value=row?row.source:'manual';
   $('c_pdf').value=row?row.pdf_url:'';
   const txt=row?(row.full_text||''):'';$('c_text').value=txt;updTextCount();
@@ -377,7 +459,7 @@ $('cOverlay').onclick=e=>{if(e.target===$('cOverlay'))$('cOverlay').classList.re
 $('cSave').onclick=async()=>{
   const p={caseno:$('c_caseno').value.trim(),date_concluded:$('c_date').value.trim(),
     presiding_en:($('c_pjudge').value==='__other'?'':$('c_pjudge').value),presiding_dv:$('c_pdv').value.trim(),
-    bench:$('c_bench').value.trim(),disposition:$('c_disp').value.trim(),source:$('c_source').value,
+    bench:$('c_bench').value.trim(),parties:$('c_parties').value.trim(),disposition:$('c_disp').value.trim(),source:$('c_source').value,
     pdf_url:$('c_pdf').value.trim(),full_text:$('c_text').value,locked:$('c_locked').checked};
   if(!p.caseno){flash($('msg'),'Case number required',false);return;}
   let r;if(editingCase){p.id=editingCase.id;r=await fetch('/api/cases',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(p)});}
@@ -514,6 +596,30 @@ function drawCompare(){
   svg+=`<line x1="${padL}" y1="${padT+plotH}" x2="${W-10}" y2="${padT+plotH}" stroke="var(--axis)"/></svg>`;
   $('chCompare').innerHTML=svg;
 }
+
+/* ---------- Users ---------- */
+async function loadUsers(){
+  const j=await (await fetch('/api/admin?action=users')).json();const us=j.users||[];
+  const head=`<table><thead><tr><th>Email</th><th>Role</th><th>Active</th><th></th></tr></thead><tbody>`;
+  $('userTable').innerHTML=head+(us.length?us.map(u=>`<tr>
+    <td>${esc(u.email)}</td>
+    <td><select class="urole" data-id="${u.id}"><option value="viewer"${u.role!=='admin'?' selected':''}>Viewer</option><option value="admin"${u.role==='admin'?' selected':''}>Admin</option></select></td>
+    <td><input type="checkbox" class="uact" data-id="${u.id}" ${u.active?'checked':''}/></td>
+    <td class="actions"><button class="sm" data-upass="${u.id}" data-email="${esc(u.email)}">Reset password</button><button class="sm danger" data-udel="${u.id}" data-email="${esc(u.email)}">Delete</button></td></tr>`).join('')
+    :'<tr><td colspan="4" class="hint" style="padding:14px">No access-given users yet. Add one above.</td></tr>')+'</tbody></table>';
+  const post=(b)=>fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});
+  document.querySelectorAll('.urole').forEach(s=>s.onchange=async()=>{await post({action:'user-update',id:s.dataset.id,role:s.value});flash($('msg'),'Role updated.',true);});
+  document.querySelectorAll('.uact').forEach(c=>c.onchange=async()=>{await post({action:'user-update',id:c.dataset.id,active:c.checked});flash($('msg'),'Updated.',true);});
+  document.querySelectorAll('[data-udel]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete '+b.dataset.email+'?'))return;await post({action:'user-delete',id:b.dataset.udel});loadUsers();flash($('msg'),'Deleted.',true);});
+  document.querySelectorAll('[data-upass]').forEach(b=>b.onclick=async()=>{const p=prompt('New password for '+b.dataset.email+':');if(!p)return;await post({action:'user-update',id:b.dataset.upass,password:p});flash($('msg'),'Password reset.',true);});
+}
+$('addUser').onclick=async()=>{
+  const email=$('u_email').value.trim(),password=$('u_pass').value,role=$('u_role').value;
+  if(!email||!password){flash($('msg'),'Email and password required.',false);return;}
+  const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'user-create',email,password,role})});
+  if(r.ok){$('u_email').value='';$('u_pass').value='';loadUsers();flash($('msg'),'User saved.',true);}
+  else{const j=await r.json().catch(()=>({}));flash($('msg'),j.error||'Failed',false);}
+};
 
 boot();
 </script>

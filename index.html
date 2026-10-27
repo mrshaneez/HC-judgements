@@ -29,6 +29,7 @@ tr:last-child td{border-bottom:none}
 tr:hover td{background:#f0f5fa}
 .thaana{font-family:"MV Faseyha","MV Boli","A_Faruma",Arial;direction:rtl;unicode-bidi:isolate}
 .pj{font-weight:600}
+td.disp{max-width:320px;font-size:.85rem;color:#33424f}
 .snip{color:#33424f;font-size:.85rem;margin-top:5px;background:#f4f7fb;border-radius:6px;padding:6px 9px;white-space:pre-wrap;direction:rtl;unicode-bidi:plaintext}
 .snip mark{background:#ffe58a;padding:0 1px}
 .badge{display:inline-block;font-size:.68rem;padding:2px 7px;border-radius:20px;white-space:nowrap}
@@ -49,19 +50,45 @@ tr:hover td{background:#f0f5fa}
 .reader{white-space:pre-wrap;direction:rtl;unicode-bidi:plaintext;font-family:"MV Faseyha","MV Boli",Arial;font-size:1.05rem;line-height:1.9;background:#fbfcfe;border:1px solid var(--line);border-radius:8px;padding:14px;max-height:62vh;overflow:auto;user-select:text}
 .modal .foot{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}
 @media (max-width:760px){.bench,.disp{display:none}}
+.loginbox{max-width:360px;margin:12vh auto;background:#fff;border:1px solid var(--line);border-radius:12px;padding:26px}
+.loginbox h1{font-size:1.4rem;margin:0 0 4px}
+.loginbox .sub{margin:0 0 14px}
+.loginbox label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
+.loginbox input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:.95rem;background:#fff;color:var(--ink)}
+.lbtn{margin-top:16px;width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px;font:inherit;cursor:pointer}
+.lmsg{color:#c0392b;font-size:.85rem;margin-bottom:8px;min-height:1em}
 </style>
 </head>
-<body><div class="wrap">
+<body>
+<div id="loginView" style="display:none">
+  <div class="loginbox">
+    <h1>Maldives Judgments</h1>
+    <p class="sub">Sign in to continue — access is restricted to authorised users.</p>
+    <div id="loginMsg" class="lmsg"></div>
+    <form id="loginForm">
+      <label>Email <span class="hint">(leave blank for admin)</span></label>
+      <input type="email" id="le" autocomplete="username" />
+      <label style="margin-top:10px">Password</label>
+      <input type="password" id="lp" autocomplete="current-password" required />
+      <button class="lbtn" type="submit">Sign in</button>
+    </form>
+  </div>
+</div>
+<div class="wrap" id="appView" style="display:none">
 <div class="topbar">
   <div>
     <h1>Maldives Judgments — Search</h1>
     <p class="sub">Search High Court judgments by keyword, principle, name, judge, year or type. Click <b>Read</b> to view and copy the text, or <b>View</b> for the original PDF.</p>
   </div>
-  <a class="adminlink" href="/admin">Admin</a>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a class="adminlink" id="adminLink" href="/admin" style="display:none">Admin</a>
+    <button class="adminlink" id="logoutBtn">Log out</button>
+  </div>
 </div>
 <div class="cards" id="stats"></div>
 <div class="controls">
   <input type="search" id="q" placeholder="Search text, principles, names, keywords… (English or ދިވެހި)" />
+  <input type="search" id="fparties" placeholder="Search parties…" />
   <select id="fyear"><option value="">All years</option></select>
   <select id="ftype"><option value="">All types</option></select>
   <select id="fjudge"><option value="">All judges</option></select>
@@ -89,7 +116,7 @@ tr:hover td{background:#f0f5fa}
 <script>
 const SRC={'text':['Judgment text','b-text'],'OCR-high':['OCR·high','b-high'],'OCR-med':['OCR·med','b-med'],'manual':['Manual','b-manual'],'needs-review':['Needs review','b-review'],'unresolved':['Unresolved','b-unres']};
 const TYPE={'A':'Appeal (HC-A)','B':'Misc (HC-B)'};
-let state={q:'',year:'',type:'',judge:'',source:'',page:1,pageSize:50,total:0};
+let state={q:'',year:'',type:'',judge:'',source:'',parties:'',page:1,pageSize:50,total:0};
 const $=id=>document.getElementById(id);
 function esc(s){return (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function badge(s){const b=SRC[s]||[s||'—','b-text'];return `<span class="badge ${b[1]}">${esc(b[0])}</span>`;}
@@ -108,7 +135,7 @@ async function loadMeta(){
 }
 function qs(){const p=new URLSearchParams();p.set('page',state.page);p.set('pageSize',state.pageSize);
   if(state.q)p.set('q',state.q);if(state.year)p.set('year',state.year);if(state.type)p.set('type',state.type);
-  if(state.judge)p.set('judge',state.judge);if(state.source)p.set('source',state.source);return p.toString();}
+  if(state.judge)p.set('judge',state.judge);if(state.source)p.set('source',state.source);if(state.parties)p.set('parties',state.parties);return p.toString();}
 async function load(){
   $('tablewrap').innerHTML='<div class="loading">Loading…</div>';
   const r=await (await fetch('/api/cases?'+qs())).json();
@@ -116,13 +143,15 @@ async function load(){
 }
 function render(rows){
   if(!rows.length){$('tablewrap').innerHTML='<div class="loading">No matching judgments.</div>';$('count').textContent='0 results';return;}
-  const head=`<table><thead><tr><th>Case No</th><th>Date</th><th>Type</th><th>Presiding</th><th class="bench">Bench</th><th>Source</th><th></th></tr></thead><tbody>`;
+  const head=`<table><thead><tr><th>Case No</th><th>Date</th><th>Type</th><th class="disp">Parties</th><th>Presiding</th><th class="bench">Bench</th><th>Source</th><th></th></tr></thead><tbody>`;
   const body=rows.map(x=>{
     const snip=(state.q&&x.snippet)?`<div class="snip">…${hl(x.snippet,state.q)}…</div>`:'';
     const read=x.has_text?`<button class="btn" data-read="${x.id}">Read</button>`:'';
     const view=x.pdf_url?`<a class="btn" href="${esc(x.pdf_url)}" target="_blank" rel="noopener">View ↗</a>`:'';
+    const typ=x.case_type?(TYPE[x.case_type]||('HC-'+x.case_type)):'';
+    const parties=esc(x.parties||'');
     return `<tr><td>${esc(x.caseno)}${snip}</td><td>${esc(x.date_concluded)}</td>
-      <td>${esc(x.case_type||'')}</td><td class="pj">${esc(x.presiding_en)}</td>
+      <td>${esc(typ)}</td><td class="disp thaana" title="${parties}">${parties}</td><td class="pj">${esc(x.presiding_en)}</td>
       <td class="bench">${esc(x.bench)}</td><td>${badge(x.source)}</td>
       <td class="act">${read}${view}</td></tr>`;
   }).join('');
@@ -142,7 +171,7 @@ async function openReader(id){
   const j=await (await fetch('/api/cases?id='+encodeURIComponent(id))).json();
   const c=j.case;if(!c)return;
   $('rTitle').textContent=c.caseno;
-  $('rMeta').innerHTML=`${esc(c.date_concluded||'')} · ${esc(c.presiding_en||'')} ${c.bench?('· '+esc(c.bench)):''}`;
+  $('rMeta').innerHTML=`${esc(c.date_concluded||'')} · ${esc(c.presiding_en||'')} ${c.bench?('· '+esc(c.bench)):''}${c.parties?('<br><b>Parties:</b> <span class="thaana">'+esc(c.parties)+'</span>'):''}${c.disposition?('<br><b>Disposition:</b> '+esc(c.disposition)):''}`;
   $('rBody').textContent=c.full_text||'No text available for this judgment (scanned image). Use “View original”.';
   $('rView').href=c.pdf_url||'#';$('rView').style.display=c.pdf_url?'':'none';
   $('rCopy').onclick=async()=>{try{await navigator.clipboard.writeText(c.full_text||'');$('rCopy').textContent='Copied!';setTimeout(()=>$('rCopy').textContent='Copy text',1500);}catch(e){}};
@@ -153,10 +182,28 @@ $('overlay').onclick=e=>{if(e.target===$('overlay'))$('overlay').classList.remov
 
 let t;
 $('q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{state.q=$('q').value.trim();state.page=1;load();},350);};
+let tp;$('fparties').oninput=()=>{clearTimeout(tp);tp=setTimeout(()=>{state.parties=$('fparties').value.trim();state.page=1;load();},350);};
 ['fyear','ftype','fjudge','fsource'].forEach(id=>$(id).onchange=()=>{
   state.year=$('fyear').value;state.type=$('ftype').value;state.judge=$('fjudge').value;state.source=$('fsource').value;
   state.page=1;load();
 });
-loadMeta();load();
+async function boot(){
+  let s={authed:false};
+  try{s=await (await fetch('/api/session')).json();}catch(e){}
+  if(s.authed){
+    $('loginView').style.display='none';$('appView').style.display='';
+    if(s.role==='admin')$('adminLink').style.display='';
+    loadMeta();load();
+  }else{
+    $('appView').style.display='none';$('loginView').style.display='';
+  }
+}
+$('loginForm').onsubmit=async e=>{e.preventDefault();
+  $('loginMsg').textContent='';
+  const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('le').value.trim(),password:$('lp').value})});
+  if(r.ok)boot();else $('loginMsg').textContent='Incorrect email or password';
+};
+$('logoutBtn').onclick=async()=>{await fetch('/api/logout',{method:'POST'});location.reload();};
+boot();
 </script>
 </body></html>

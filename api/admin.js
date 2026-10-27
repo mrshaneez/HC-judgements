@@ -1,6 +1,6 @@
 import { ensureDb, ingestRows, listUsers, createUser, updateUser, deleteUser } from '../lib/db.js';
 import { sql } from '@vercel/postgres';
-import { isAdmin } from '../lib/auth.js';
+import { isAdmin, isAuthed } from '../lib/auth.js';
 
 // Combined admin endpoint (all admin-only). Actions:
 //   GET  ?action=stats                      -> dashboard + analytics aggregates
@@ -122,6 +122,13 @@ async function reextract(body) {
 }
 
 export default async function handler(req, res) {
+  // Dashboard stats are available to any signed-in user (viewers + admins).
+  if (req.method === 'GET' && (req.query.action || 'stats') === 'stats') {
+    if (!isAuthed(req)) return res.status(401).json({ error: 'Not authenticated' });
+    await ensureDb();
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json(await stats({ from: req.query.from, to: req.query.to }));
+  }
   if (!isAdmin(req)) return res.status(401).json({ error: 'Admin only' });
   try {
     await ensureDb();

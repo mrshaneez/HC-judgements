@@ -1,9 +1,10 @@
 import { listCases, getCase, createCase, updateCase, deleteCase } from '../lib/db.js';
-import { isAuthed } from '../lib/auth.js';
+import { isAuthed, isAdmin } from '../lib/auth.js';
 
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
+      if (!isAuthed(req)) return res.status(401).json({ error: 'Not authenticated' });
       res.setHeader('Cache-Control', 'no-store');
       const { id, caseno } = req.query;
       if (id || caseno) {
@@ -11,12 +12,12 @@ export default async function handler(req, res) {
         if (!row) return res.status(404).json({ error: 'Not found' });
         return res.status(200).json({ case: row });   // includes full_text
       }
-      const { q = '', year = '', type = '', judge = '', source = '', page = '1', pageSize = '50' } = req.query;
-      const out = await listCases({ q, year, type, judge, source, page, pageSize });
+      const { q = '', year = '', type = '', judge = '', source = '', parties = '', page = '1', pageSize = '50' } = req.query;
+      const out = await listCases({ q, year, type, judge, source, parties, page, pageSize });
       return res.status(200).json(out);
     }
 
-    if (!isAuthed(req)) return res.status(401).json({ error: 'Not authenticated' });
+    if (!isAdmin(req)) return res.status(401).json({ error: 'Admin only' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
 
     if (req.method === 'POST') {

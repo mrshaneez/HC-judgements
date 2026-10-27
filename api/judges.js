@@ -1,13 +1,14 @@
 import { listJudges, createJudge, updateJudge, deleteJudge } from '../lib/db.js';
-import { isAuthed } from '../lib/auth.js';
+import { isAuthed, isAdmin } from '../lib/auth.js';
 
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
+      if (!isAuthed(req)) return res.status(401).json({ error: 'Not authenticated' });
       res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json({ judges: await listJudges() });   // public (for dropdowns/filters)
+      return res.status(200).json({ judges: await listJudges() });   // any signed-in user (for dropdowns/filters)
     }
-    if (!isAuthed(req)) return res.status(401).json({ error: 'Not authenticated' });
+    if (!isAdmin(req)) return res.status(401).json({ error: 'Admin only' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
 
     if (req.method === 'POST') {

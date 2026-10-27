@@ -101,7 +101,7 @@ def enumerate_all():
             "court": "HC",
             "source": "needs-review",
             "bench": (r.get("fandiyaaru") or "").strip(),
-            "disposition": (r.get("massala") or "").strip(),
+            "parties": (r.get("massala") or "").strip(),
         })
     # de-dup by caseno (keep first)
     uniq = {}

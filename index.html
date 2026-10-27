@@ -138,8 +138,8 @@ td.disp{max-width:320px;font-size:.85rem;color:#33424f}
       <h2 style="margin:0">Judge performance</h2>
       <button class="sm pset" data-range="week">This week</button>
       <button class="sm pset" data-range="month">This month</button>
-      <button class="sm pset" data-range="year">This year</button>
-      <button class="sm pset active" data-range="all">All time</button>
+      <button class="sm pset active" data-range="year">This year</button>
+      <button class="sm pset" data-range="all">All time</button>
       <span class="hint">custom:</span>
       <input type="date" id="jfFrom" style="width:auto" />
       <span>–</span>
@@ -278,8 +278,12 @@ async function loadDash(){
   $('tiles').innerHTML=tiles.map(([l,n,c])=>`<div class="tile ${c}"><div class="n">${n==null?'—':n}</div><div class="l">${l}</div></div>`).join('');
   $('chYear').innerHTML=hbars((s.years||[]).map(r=>({label:r.year,value:r.n})),'#2f6fb0');
   $('chType').innerHTML=hbars((s.types||[]).map(r=>({label:r.case_type,value:r.n})),'#2f6fb0');
-  renderJudgeCards(s.judges,'All time');
   setupJudgeFilter();
+  // Default the judge-performance view to the current year.
+  const r=presetRange('year');
+  $('jfFrom').value=r.from;$('jfTo').value=r.to;
+  document.querySelectorAll('.pset').forEach(x=>x.classList.toggle('active',x.dataset.range==='year'));
+  loadJudgeCards(r.from,r.to,'This year ('+r.from+' → '+r.to+')');
 }
 function isoDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function presetRange(kind){

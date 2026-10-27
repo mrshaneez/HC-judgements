@@ -57,6 +57,26 @@ td.disp{max-width:320px;font-size:.85rem;color:#33424f}
 .loginbox input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:.95rem;background:#fff;color:var(--ink)}
 .lbtn{margin-top:16px;width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px;font:inherit;cursor:pointer}
 .lmsg{color:#c0392b;font-size:.85rem;margin-bottom:8px;min-height:1em}
+/* nav + dashboard */
+.nav{display:flex;gap:8px;margin:0 0 16px}
+.navbtn{font:inherit;font-size:.9rem;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 16px;color:var(--ink)}
+.navbtn:hover{background:#f0f5fa}
+.navbtn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:120px}
+.tile .n{font-size:1.5rem;font-weight:700;color:var(--accent)}
+.tile .l{font-size:.78rem;color:var(--muted)}
+.tile.warn .n{color:#a85b12}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:16px}
+.card h2{font-size:1rem;margin:0 0 10px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.sm{font:inherit;font-size:.8rem;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 10px;color:var(--ink)}
+.sm:hover{background:#eef4fb}
+.pset.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.hint{color:var(--muted);font-size:.82rem}
+.jfmsg{color:#c0392b;font-size:.8rem}
+@media(max-width:760px){.row2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -85,6 +105,11 @@ td.disp{max-width:320px;font-size:.85rem;color:#33424f}
     <button class="adminlink" id="logoutBtn">Log out</button>
   </div>
 </div>
+<div class="nav" id="nav">
+  <button class="navbtn active" id="navSearch">Search</button>
+  <button class="navbtn" id="navDash">Dashboard</button>
+</div>
+<div id="searchView">
 <div class="cards" id="stats"></div>
 <div class="controls">
   <input type="search" id="q" placeholder="Search text, principles, names, keywords… (English or ދިވެހި)" />
@@ -100,6 +125,33 @@ td.disp{max-width:320px;font-size:.85rem;color:#33424f}
 <div class="count" id="count"></div>
 <div id="tablewrap"><div class="loading">Loading…</div></div>
 <div class="pager" id="pager"></div>
+</div><!-- /searchView -->
+
+<div id="dashView" style="display:none">
+  <div class="tiles" id="tiles"></div>
+  <div class="row2" style="margin-top:16px">
+    <div class="card"><h2>Judgments by year</h2><div id="chYear"></div></div>
+    <div class="card"><h2>Judgments by type</h2><div id="chType"></div></div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <div class="bar">
+      <h2 style="margin:0">Judge performance</h2>
+      <button class="sm pset" data-range="week">This week</button>
+      <button class="sm pset" data-range="month">This month</button>
+      <button class="sm pset" data-range="year">This year</button>
+      <button class="sm pset active" data-range="all">All time</button>
+      <span class="hint">custom:</span>
+      <input type="date" id="jfFrom" style="width:auto" />
+      <span>–</span>
+      <input type="date" id="jfTo" style="width:auto" />
+      <button class="sm" id="jfApply">Apply</button>
+      <span id="jfLabel" class="hint"></span>
+      <span id="jfMsg" class="jfmsg"></span>
+    </div>
+    <p class="hint" style="margin-top:0">Each card = cases a judge <b>concluded</b> (presided) in the selected period; the small number is cases they sat on the bench for.</p>
+    <div class="tiles" id="judgeCards"></div>
+  </div>
+</div><!-- /dashView -->
 </div>
 
 <div class="overlay" id="overlay"><div class="modal">
@@ -204,6 +256,85 @@ $('loginForm').onsubmit=async e=>{e.preventDefault();
   if(r.ok)boot();else $('loginMsg').textContent='Incorrect email or password';
 };
 $('logoutBtn').onclick=async()=>{await fetch('/api/logout',{method:'POST'});location.reload();};
+
+/* ---------- Dashboard (visible to all signed-in users) ---------- */
+let dashLoaded=false;
+function showView(which){
+  const dash=which==='dash';
+  $('searchView').style.display=dash?'none':'';
+  $('dashView').style.display=dash?'':'none';
+  $('navSearch').classList.toggle('active',!dash);
+  $('navDash').classList.toggle('active',dash);
+  if(dash&&!dashLoaded){dashLoaded=true;loadDash();}
+}
+$('navSearch').onclick=()=>showView('search');
+$('navDash').onclick=()=>showView('dash');
+
+async function loadDash(){
+  let s={};try{s=await (await fetch('/api/admin?action=stats')).json();}catch(e){}
+  const t=s.totals||{};
+  const tiles=[['Total judgments',t.total,''],['With text',t.withText,''],['Needs review',t.needsReview,'warn'],
+    ['Text pending',t.pending,''],['Scanned (no text)',t.scanned,''],['Locked',t.locked,'']];
+  $('tiles').innerHTML=tiles.map(([l,n,c])=>`<div class="tile ${c}"><div class="n">${n==null?'—':n}</div><div class="l">${l}</div></div>`).join('');
+  $('chYear').innerHTML=hbars((s.years||[]).map(r=>({label:r.year,value:r.n})),'#2f6fb0');
+  $('chType').innerHTML=hbars((s.types||[]).map(r=>({label:r.case_type,value:r.n})),'#2f6fb0');
+  renderJudgeCards(s.judges,'All time');
+  setupJudgeFilter();
+}
+function isoDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function presetRange(kind){
+  const now=new Date();const to=isoDate(now);
+  if(kind==='week'){const d=new Date(now);const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);return{from:isoDate(d),to};}
+  if(kind==='month')return{from:isoDate(new Date(now.getFullYear(),now.getMonth(),1)),to};
+  if(kind==='year')return{from:isoDate(new Date(now.getFullYear(),0,1)),to};
+  return{from:'',to:''};
+}
+function renderJudgeCards(judges,label){
+  $('jfLabel').textContent=label?('· '+label):'';
+  const data=(judges||[]).slice().sort((a,b)=>b.presided-a.presided);
+  $('judgeCards').innerHTML=data.length
+    ? data.map(j=>`<div class="tile"><div class="n">${j.presided}</div><div class="l">${esc(j.name_en)}</div><div class="hint">${j.bench} on bench</div></div>`).join('')
+    : '<p class="hint">No judge data for this period.</p>';
+}
+async function loadJudgeCards(from,to,label){
+  $('judgeCards').innerHTML='<p class="hint">Loading…</p>';
+  const q=(from&&to)?('&from='+from+'&to='+to):'';
+  let s={};try{s=await (await fetch('/api/admin?action=stats'+q)).json();}catch(e){}
+  renderJudgeCards(s.judges,label);
+}
+let judgeFilterWired=false;
+function setupJudgeFilter(){
+  if(judgeFilterWired)return;judgeFilterWired=true;
+  document.querySelectorAll('.pset').forEach(b=>b.onclick=()=>{
+    $('jfMsg').textContent='';
+    document.querySelectorAll('.pset').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+    const kind=b.dataset.range;
+    if(kind==='all'){$('jfFrom').value='';$('jfTo').value='';loadJudgeCards('','','All time');return;}
+    const r=presetRange(kind);$('jfFrom').value=r.from;$('jfTo').value=r.to;
+    const nm={week:'This week',month:'This month',year:'This year'}[kind];
+    loadJudgeCards(r.from,r.to,nm+' ('+r.from+' → '+r.to+')');
+  });
+  $('jfApply').onclick=()=>{const f=$('jfFrom').value,tt=$('jfTo').value;$('jfMsg').textContent='';
+    if(!f||!tt){$('jfMsg').textContent='Pick both From and To dates.';return;}
+    if(f>tt){$('jfMsg').textContent='From date is after To date.';return;}
+    document.querySelectorAll('.pset').forEach(x=>x.classList.remove('active'));
+    loadJudgeCards(f,tt,f+' → '+tt);};
+}
+function hbars(data,color){
+  if(!data.length)return '<p class="hint">No data yet.</p>';
+  const max=Math.max(1,...data.map(d=>d.value));
+  const W=520,rowH=26,lblW=70,valW=44,plot=W-lblW-valW;
+  const H=data.length*rowH+8;
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px" role="img">`;
+  data.forEach((d,i)=>{
+    const y=i*rowH+4,bw=Math.max(2,plot*d.value/max);
+    svg+=`<text x="${lblW-8}" y="${y+rowH/2}" text-anchor="end" dominant-baseline="middle" font-size="12" fill="var(--ink)">${esc(d.label)}</text>`;
+    svg+=`<rect x="${lblW}" y="${y+4}" width="${bw}" height="${rowH-12}" rx="4" fill="${color}"><title>${esc(d.label)}: ${d.value}</title></rect>`;
+    svg+=`<text x="${lblW+bw+6}" y="${y+rowH/2}" dominant-baseline="middle" font-size="12" font-weight="600" fill="var(--ink)">${d.value}</text>`;
+  });
+  svg+=`</svg>`;return svg;
+}
+
 boot();
 </script>
 </body></html>

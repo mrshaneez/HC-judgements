@@ -18,42 +18,55 @@ async function stats(opts = {}) {
   const from = (opts.from || '').trim();
   const to = (opts.to || '').trim();
   const hasRange = /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to);
-  const one = async (q) => (await q).rows[0].n;
-  const total       = await one(sql`SELECT COUNT(*)::int AS n FROM cases;`);
-  const withText    = await one(sql`SELECT COUNT(*)::int AS n FROM cases WHERE full_text <> '';`);
-  const needsReview = await one(sql`SELECT COUNT(*)::int AS n FROM cases WHERE presiding_en IS NULL OR trim(presiding_en) = '';`);
-  const scanned     = await one(sql`SELECT COUNT(*)::int AS n FROM cases WHERE text_tried = TRUE AND (full_text IS NULL OR full_text = '') AND pdf_url <> '';`);
-  const pending     = await one(sql`SELECT COUNT(*)::int AS n FROM cases WHERE (full_text IS NULL OR full_text = '') AND text_tried = FALSE AND pdf_url <> '';`);
-  const locked      = await one(sql`SELECT COUNT(*)::int AS n FROM cases WHERE locked = TRUE;`);
 
-  const years = (await sql`SELECT year, COUNT(*)::int AS n FROM cases WHERE year IS NOT NULL GROUP BY year ORDER BY year;`).rows;
-  const types = (await sql`SELECT case_type, COUNT(*)::int AS n FROM cases WHERE case_type <> '' GROUP BY case_type ORDER BY case_type;`).rows;
+  // One "presided" count for ALL judges via a single GROUP BY (was 1 query per judge).
+  const presidedAgg = hasRange
+    ? sql.query(`SELECT lower(trim(presiding_en)) AS pj, COUNT(*)::int AS n FROM cases WHERE date_concluded >= $1 AND date_concluded <= $2 GROUP BY lower(trim(presiding_en))`, [from, to])
+    : sql`SELECT lower(trim(presiding_en)) AS pj, COUNT(*)::int AS n FROM cases GROUP BY lower(trim(presiding_en));`;
 
-  const jbase = (await sql`SELECT name_en, name_dv FROM judges WHERE active ORDER BY name_en;`).rows;
-  const judges = [];
-  for (const j of jbase) {
+  // Every top-level aggregate fires together instead of one-at-a-time.
+  const [totalR, withTextR, needsReviewR, scannedR, pendingR, lockedR, yearsR, typesR, jbaseR, presidedByYearR, presidedAggR] = await Promise.all([
+    sql`SELECT COUNT(*)::int AS n FROM cases;`,
+    sql`SELECT COUNT(*)::int AS n FROM cases WHERE full_text <> '';`,
+    sql`SELECT COUNT(*)::int AS n FROM cases WHERE presiding_en IS NULL OR trim(presiding_en) = '';`,
+    sql`SELECT COUNT(*)::int AS n FROM cases WHERE text_tried = TRUE AND (full_text IS NULL OR full_text = '') AND pdf_url <> '';`,
+    sql`SELECT COUNT(*)::int AS n FROM cases WHERE (full_text IS NULL OR full_text = '') AND text_tried = FALSE AND pdf_url <> '';`,
+    sql`SELECT COUNT(*)::int AS n FROM cases WHERE locked = TRUE;`,
+    sql`SELECT year, COUNT(*)::int AS n FROM cases WHERE year IS NOT NULL GROUP BY year ORDER BY year;`,
+    sql`SELECT case_type, COUNT(*)::int AS n FROM cases WHERE case_type <> '' GROUP BY case_type ORDER BY case_type;`,
+    sql`SELECT name_en, name_dv FROM judges WHERE active ORDER BY name_en;`,
+    sql`SELECT presiding_en, year, COUNT(*)::int AS n FROM cases WHERE presiding_en <> '' AND year IS NOT NULL GROUP BY presiding_en, year ORDER BY year;`,
+    presidedAgg,
+  ]);
+
+  const presMap = new Map(presidedAggR.rows.map(r => [r.pj, r.n]));
+  const jbase = jbaseR.rows;
+
+  // Bench counts still need a per-judge pattern match on two name variants — but fire them all at once.
+  const benchCounts = await Promise.all(jbase.map(j => {
     const enLike = '%' + j.name_en + '%';
     const dvLike = j.name_dv ? '%' + j.name_dv + '%' : '\u0000x\u0000';
-    let presided, bench;
-    if (hasRange) {
-      presided = (await sql.query(
-        `SELECT COUNT(*)::int AS n FROM cases WHERE trim(presiding_en) ILIKE trim($1) AND date_concluded >= $2 AND date_concluded <= $3`,
-        [j.name_en, from, to])).rows[0].n;
-      bench = (await sql.query(
-        `SELECT COUNT(*)::int AS n FROM cases WHERE (bench ILIKE $1 OR presiding_en ILIKE $1 OR bench ILIKE $2 OR presiding_dv ILIKE $2) AND date_concluded >= $3 AND date_concluded <= $4`,
-        [enLike, dvLike, from, to])).rows[0].n;
-    } else {
-      presided = (await sql`SELECT COUNT(*)::int AS n FROM cases WHERE trim(presiding_en) ILIKE trim(${j.name_en});`).rows[0].n;
-      bench = (await sql`SELECT COUNT(*)::int AS n FROM cases
-        WHERE bench ILIKE ${enLike} OR presiding_en ILIKE ${enLike} OR bench ILIKE ${dvLike} OR presiding_dv ILIKE ${dvLike};`).rows[0].n;
-    }
-    judges.push({ name_en: j.name_en, name_dv: j.name_dv, presided, bench });
-  }
-  const presidedByYear = (await sql`
-    SELECT presiding_en, year, COUNT(*)::int AS n FROM cases
-    WHERE presiding_en <> '' AND year IS NOT NULL GROUP BY presiding_en, year ORDER BY year;`).rows;
+    const p = hasRange
+      ? sql.query(`SELECT COUNT(*)::int AS n FROM cases WHERE (bench ILIKE $1 OR presiding_en ILIKE $1 OR bench ILIKE $2 OR presiding_dv ILIKE $2) AND date_concluded >= $3 AND date_concluded <= $4`, [enLike, dvLike, from, to])
+      : sql.query(`SELECT COUNT(*)::int AS n FROM cases WHERE bench ILIKE $1 OR presiding_en ILIKE $1 OR bench ILIKE $2 OR presiding_dv ILIKE $2`, [enLike, dvLike]);
+    return p.then(r => r.rows[0].n);
+  }));
 
-  return { totals: { total, withText, needsReview, scanned, pending, locked }, years, types, judges, presidedByYear, range: hasRange ? { from, to } : null };
+  const judges = jbase.map((j, i) => ({
+    name_en: j.name_en,
+    name_dv: j.name_dv,
+    presided: presMap.get(String(j.name_en || '').trim().toLowerCase()) || 0,
+    bench: benchCounts[i],
+  }));
+
+  return {
+    totals: {
+      total: totalR.rows[0].n, withText: withTextR.rows[0].n, needsReview: needsReviewR.rows[0].n,
+      scanned: scannedR.rows[0].n, pending: pendingR.rows[0].n, locked: lockedR.rows[0].n,
+    },
+    years: yearsR.rows, types: typesR.rows, judges, presidedByYear: presidedByYearR.rows,
+    range: hasRange ? { from, to } : null,
+  };
 }
 
 async function sync(limitRaw) {
